@@ -42,6 +42,7 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on('pageerror',error=>errors.push(error.message));
  const requests=[];page.on('request',request=>{if(request.url().includes('/api/'))requests.push(request.url())});
  await waitReady(page,target);
+ assert.match(await page.getByRole('combobox',{name:'Select project'}).locator('option:checked').innerText(),/Checkout/);check('Fresh browsers open the audited demo instead of an arbitrary imported project');
  assert.equal(await page.getByRole('button',{name:'Play 3D rotation'}).count(),1);check('3D map starts paused and remains interactive on demand');
  assert.equal(requests.filter(url=>url.endsWith('/workspace')).length,1);
  assert.equal(requests.filter(url=>/\/(activity|report|plans|evidence|memory)$/.test(url)).length,0);check('Initial project data uses one workspace request; activity traces are lazy');
@@ -70,5 +71,9 @@ try{
  assert.equal(await page.locator('.universe-svg').evaluate(el=>getComputedStyle(el).touchAction),'pan-y');check('Mobile layout has no horizontal overflow, dismissible navigation and native vertical map scrolling');
  await page.screenshot({path:'output/qa/performance-mobile.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'output/qa/performance-overview.png',fullPage:true});
+ const uploaded=await page.request.post(target+'/api/projects/import/folder',{multipart:{files:{name:'main.py',mimeType:'text/plain',buffer:Buffer.from('def sample(): return True\n')},paths:JSON.stringify(['main.py'])}});assert(uploaded.ok());const single=await uploaded.json();results.temporaryProjects=[single.id];
+ await page.reload();await page.getByRole('combobox',{name:'Select project'}).selectOption(single.id);await page.waitForFunction(()=>document.querySelectorAll('[data-node]').length===1);
+ await page.locator('.universe-svg').scrollIntoViewIfNeeded();await page.waitForTimeout(250);await page.getByRole('button',{name:'Play 3D rotation'}).click();const singleInitial=await page.locator('[data-node]').getAttribute('transform');await page.waitForFunction(previous=>document.querySelector('[data-node]')?.getAttribute('transform')!==previous,singleInitial,{timeout:5000});check('Single-language imported projects visibly rotate instead of sitting on a fixed pole');
+
  assert.deepEqual(errors,[]);
 }finally{await fs.writeFile('output/qa/performance-verification.json',JSON.stringify(results,null,2));await browser.close()}

@@ -1,11 +1,11 @@
 # Scrolling and workflow improvements
 
-The overview now gives a concrete next action: index requirements, create a plan, review approval, inspect a running test, or open the report. Its five navigation steps explain the workflow, and the bundled demo explicitly explains its intentional coupon failure. Start analysis opens requirements first. Loading states distinguish cloud startup from an empty project; mobile navigation closes with the backdrop or Escape. Chat scrolls its message container rather than the whole page.
+Fresh browsers open the audited demo by default; an explicitly saved project selection is preserved. The overview now gives a concrete next action: index requirements, create a plan, review approval, inspect a running test, or open the report. Its five navigation steps explain the workflow, and the bundled demo explicitly explains its intentional coupon failure. Start analysis opens requirements first. Loading states distinguish cloud startup from an empty project; mobile navigation closes with the backdrop or Escape. Chat scrolls its message container rather than the whole page.
 
 ## Rendering changes
 
 - The wallpaper is blurred once on a fixed layer. Scrolling cards keep transparent fills and neo-brutalist borders without individual backdrop filters. Sidebar/modal blur is limited.
-- The 3D map starts paused. Play, drag, zoom, node inspection and keyboard rotation remain available. Animation is suspended while scrolling, off-screen or in a hidden tab; reduced-motion settings remain respected.
+- The 3D map starts paused; its point distribution also supports one- and two-node projects. Play, drag, zoom, node inspection and keyboard rotation remain available. Animation is suspended while scrolling, off-screen or in a hidden tab; reduced-motion settings remain respected.
 - Stable callbacks and memoization avoid rebuilding the visualizations on unrelated form changes.
 
 ## Data changes

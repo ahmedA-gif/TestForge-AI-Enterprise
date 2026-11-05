@@ -56,12 +56,16 @@ export default function WorkflowGuide({project,knowledge,plans,runs,busy,navigat
     label = 'Open release report'; action = () => navigate('release');
   }
 
-  const steps = [
+  const steps = suites.length ? [
     {label:'Requirements',view:'knowledge',done:!!knowledge.index},
     {label:'Test plan',view:'repository',done:plans.length > 0},
     {label:'Approval',view:'approvals',done:plans.some(plan => plan.state === 'approved')},
     {label:'Results',view:'runs',done:finished},
     {label:'Report',view:'release',done:finished && !nextSuite && !running},
+  ] : [
+    {label:'Inspect files',view:'repository',done:true},
+    {label:'Index documents',view:'knowledge',done:!!knowledge.index},
+    {label:'Ask about this project',view:'agent',done:false},
   ];
 
   return <section className="panel getting-started" aria-label="Step-by-step project guide">
@@ -69,6 +73,7 @@ export default function WorkflowGuide({project,knowledge,plans,runs,busy,navigat
     <p>{description}</p>
     <div className="guide-actions"><button className="btn primary" disabled={busy} onClick={action}>{label}<ArrowRight size={16}/></button><button className="text-button" onClick={() => navigate('agent')}>Ask a question<ArrowRight size={14}/></button></div>
     <ol className="guide-steps">{steps.map((step,index) => <li key={step.view}><button onClick={() => navigate(step.view)}><span className={step.done ? 'complete' : ''}>{step.done ? <Check size={12}/> : index + 1}</span>{step.label}</button></li>)}</ol>
+    {!suites.length && <p className="guide-demo-note">Your imported files power the inventory, charts and document analysis. Test execution is available only for the audited demo.</p>}
     {project.demo && <p className="guide-demo-note">Demo tip: one expired-coupon test deliberately fails. A NO-GO verdict shows that the release gate is working.</p>}
   </section>;
 }

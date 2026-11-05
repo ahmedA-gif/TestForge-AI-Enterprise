@@ -48,6 +48,10 @@
     ".wrangler",
     ".sites-runtime",
     "outputs",
-    "work"
+    "work",
+    "data",
+    "output",
+    "logs",
+    ".venv"
   ]
 }

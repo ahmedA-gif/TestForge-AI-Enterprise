@@ -25,3 +25,15 @@ Platform regressions, live NVIDIA/RAG/MCP checks, desktop/mobile browser checks 
 The repository already had ESLint failures in the original page, visualizations and project-display helper (20 errors in the baseline comparison). This change reduces that count; the new guide has no lint findings. Source typing and production-build checks are evaluated separately from that existing lint backlog.
 
 The macOS Desktop folder denied access during this change. Work was performed in `/Users/macbookpro/testforge-performance-work`, a fresh checkout of the same GitHub repository. The original Desktop checkout and its local databases were not modified.
+
+## Follow-up: static glass and local source refresh
+
+Removed all remaining live backdrop filters, wallpaper blur and SVG shadow filters; transparency and sharp borders remain. Repository lists initially mount 100 matching rows and offer Show more. Mobile input text is 16 px to avoid browser focus zoom; primary navigation targets are at least 44 px high.
+
+Folder picker uploads exclude dependency/cache directories and private filenames before counting bytes or sending files. Uploaded folders use their actual folder name. Local directory imports offer Read latest files, which creates a new isolated snapshot and resets project-specific views; documents must be indexed for that snapshot. Workspace refresh also fetches the current project inventory. Imported-project guidance now uses Inspect files → Index documents → Ask about this project instead of suggesting unavailable test execution.
+
+Validation: 62 platform tests, 13 existing performance/workflow checks, and scripts/local-project-qa.mjs verify a 111-file upload with a 4 MB excluded dependency and private file, bounded rendering/search, a changed local directory becoming a 112-file snapshot, correct language counts and no page errors. A 4× CPU-throttled Chromium scroll sample recorded p95 25 ms and maximum 104 ms; this is a local development sample, not a promise of zero dropped frames on every device.
+
+Local development also excludes data/output/logs/venv from Vite watching and TypeScript compilation. Tailwind scans only app/components; importing source or writing test artifacts must not trigger UI style rebuilds. This prevents imported TypeScript from being compiled as application code.
+
+After excluding generated files from watching, the repeat local import/browser check passed without hot reloads. The same 100-frame, 4× CPU-throttled sample recorded p95 24 ms and maximum 38 ms. Both samples are diagnostic, not a controlled cross-device benchmark.

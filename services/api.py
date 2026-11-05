@@ -69,6 +69,8 @@ async def import_folder(files:list[UploadFile]=File(...),paths:str=Form(...)):
             if len(content)>2*1024*1024 or total>25*1024*1024:raise ValueError('Folder exceeds 2 MB/file or 25 MB total quota')
             bundle.writestr(name,content)
     p=import_zip(buffer.getvalue(),'Selected folder')
+    roots={name.split('/')[0] for name in names if '/' in name}
+    if len(roots)==1:p['name']=next(iter(roots))[:100]
     p['import_method']='folder_upload';return put('project',p)
 @app.get('/api/projects/{project_id}')
 def project(project_id:str):return get('project',project_id)

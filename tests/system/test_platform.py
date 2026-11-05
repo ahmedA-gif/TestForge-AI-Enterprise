@@ -145,7 +145,7 @@ def test_folder_upload_and_traversal():
     from services.api import app
     with TestClient(app,base_url='http://127.0.0.1:8010',client=('127.0.0.1',44000)) as c:
         r=c.post('/api/projects/import/folder',files=[('files',('main.py',b'x=1','text/plain')),('files',('.env',b'SECRET=private','text/plain'))],data={'paths':json.dumps(['repo/main.py','repo/.env'])})
-        assert r.status_code==201;assert r.json()['import_method']=='folder_upload';assert [f['path'] for f in r.json()['files']]==['repo/main.py']
+        assert r.status_code==201;assert r.json()['name']=='repo';assert r.json()['import_method']=='folder_upload';assert [f['path'] for f in r.json()['files']]==['repo/main.py']
         r=c.post('/api/projects/import/folder',files=[('files',('main.py',b'x=1','text/plain'))],data={'paths':json.dumps(['../escape.py'])});assert r.status_code==422
 
 def test_imported_requirements_are_discovered_not_demo_defaults():

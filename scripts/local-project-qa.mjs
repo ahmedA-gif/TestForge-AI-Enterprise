@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import {pathToFileURL} from 'node:url';
+let pw;try{pw=await import('playwright')}catch{pw=await import(pathToFileURL(process.env.TESTFORGE_PLAYWRIGHT_MODULE||path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')).href)}
+const root=path.resolve('output/qa/local-import-fixture');
+await fs.mkdir(path.join(root,'node_modules'),{recursive:true});
+await fs.writeFile(path.join(root,'.env'),'PRIVATE_TEST_VALUE=excluded');
+await fs.writeFile(path.join(root,'node_modules','dependency.js'),'x'.repeat(4*1024*1024));
+await fs.writeFile(path.join(root,'README.md'),'# Local project\nA real local QA inventory.');
+for(let i=0;i<110;i++)await fs.writeFile(path.join(root,`module_${i}.py`),`def function_${i}(): return ${i}\n`);
+const browser=await pw.chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});
+const result={checks:[],errors:[],createdProjects:[]};page.on('pageerror',e=>result.errors.push(e.message));
+try{
+await page.goto('http://127.0.0.1:5173');await page.getByRole('button',{name:'Start analysis',exact:false}).waitFor();
+await page.locator('.workspace-loading').waitFor({state:'hidden'});
+await page.getByRole('button',{name:'Import project',exact:true}).click();
+await page.getByRole('heading',{name:'Import your project.'}).waitFor();
+const response=page.waitForResponse(r=>r.url().endsWith('/projects/import/folder')&&r.request().method()==='POST');
+await page.locator('input[webkitdirectory]').setInputFiles(root);
+const imported=await (await response).json();result.createdProjects.push(imported.id);
+assert.equal(imported.name,'local-import-fixture');assert.equal(imported.files.length,111);assert.equal(imported.languages.Python,110);
+assert(!imported.files.some(f=>/node_modules|\.env/.test(f.path)));result.checks.push('Folder upload excludes private/dependency files before quota; actual name, 111 files and languages retained');
+await page.getByRole('heading',{name:'File explorer'}).waitFor();assert.equal(await page.locator('.file-row').count(),100);
+await page.getByRole('button',{name:'Show 100 more files'}).click();assert.equal(await page.locator('.file-row').count(),111);
+await page.getByPlaceholder('Filter files…').fill('module_109');assert.equal(await page.locator('.file-row').count(),1);result.checks.push('Bounded file rendering, Show more and search work');
+await page.getByRole('button',{name:'Import project',exact:true}).click();
+await page.getByLabel('Absolute directory path').fill(root);
+const localResponse=page.waitForResponse(r=>r.url().endsWith('/projects/import/local')&&r.request().method()==='POST');
+await page.getByRole('button',{name:'Import directory',exact:true}).click();const local=await(await localResponse).json();result.createdProjects.push(local.id);
+await page.getByRole('button',{name:'Read latest files'}).waitFor();
+await fs.writeFile(path.join(root,'new-feature.ts'),'export const feature = true;');
+const freshResponse=page.waitForResponse(r=>r.url().endsWith('/projects/import/local')&&r.request().method()==='POST');
+await page.getByRole('button',{name:'Read latest files'}).click();const fresh=await(await freshResponse).json();result.createdProjects.push(fresh.id);
+assert.notEqual(fresh.id,local.id);assert.equal(fresh.files.length,112);assert.equal(fresh.languages.TypeScript,1);assert.notEqual(fresh.snapshot,local.snapshot);
+await page.getByPlaceholder('Filter files…').fill('new-feature');await page.getByText('new-feature.ts',{exact:true}).waitFor();result.checks.push('Read latest files imports changed local directory and shows the new file without demo data');
+await page.getByRole('button',{name:'Overview',exact:true}).click();await page.locator('.workspace-loading').waitFor({state:'hidden'});
+const filters=await page.evaluate(()=>Array.from(document.querySelectorAll('*')).filter(el=>{const s=getComputedStyle(el);return s.backdropFilter&&s.backdropFilter!=='none'}).length);assert.equal(filters,0);
+const background=await page.evaluate(()=>getComputedStyle(document.body,'::before').filter);assert.equal(background,'none');result.checks.push('Zero live backdrop filters or wallpaper blur');
+const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
+result.scroll=await page.evaluate(async()=>{const gaps=[];let previous=performance.now();for(let i=0;i<100;i++){await new Promise(requestAnimationFrame);const now=performance.now();gaps.push(now-previous);previous=now;window.scrollTo(0,(document.documentElement.scrollHeight-innerHeight)*(i<50?i/50:(100-i)/50))}gaps.sort((a,b)=>a-b);return {frames:gaps.length,p95FrameMs:Math.round(gaps[94]),maxFrameMs:Math.round(gaps[99])}});
+await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:'output/qa/local-project-updated.png',fullPage:true});
+assert.equal(result.errors.length,0);console.log(JSON.stringify(result,null,2));
+}finally{await fs.writeFile('output/qa/local-project-verification.json',JSON.stringify(result,null,2));await browser.close();await fs.rm(root,{recursive:true,force:true})}

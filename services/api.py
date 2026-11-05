@@ -142,7 +142,12 @@ def reject(plan_id:str):
         c.execute("UPDATE records SET data=? WHERE kind='plan' AND id=?",(json.dumps(plan),plan_id))
     audit('plan.rejected',plan_id);return plan
 @app.get('/api/projects/{project_id}/runs')
-def runs(project_id:str):return all_records('run',project_id)
+def runs(project_id:str,summary:bool=False):
+    rows=all_records('run',project_id)
+    if not summary:return rows
+    # Poll progress without repeatedly transferring test output and assertion bodies.
+    keys={'id','project_id','suite_id','status','counts','started_at','queued_at','finished_at','duration_ms','exit_code','error'}
+    return [{key:value for key,value in row.items() if key in keys} for row in rows]
 @app.get('/api/runs/{run_id}')
 def run(run_id:str):return get('run',run_id)
 @app.get('/api/runs/{run_id}/artifacts/{name}')
@@ -166,6 +171,19 @@ def report(project_id:str):
     counts={k:sum(r.get('counts',{}).get(k,0) for r in latest.values()) for k in ['passed','failed','errors','skipped']}
     mapped={req for s in p['suites'] if s['id'] in latest for req in s['requirements']}
     return {'project':p['name'],'project_id':p['id'],'snapshot':p['snapshot'],'verdict':gate(rs,p['suites']),'counts':counts,'runs':list(latest.values()),'traceability':[{'requirement':req,'mapped':req in mapped,'suite_ids':[s['id'] for s in p['suites'] if req in s['requirements']]} for req in sorted({match for doc in documents(p) for match in re.findall(r'\b(?:R|REQ)-\d+\b',doc['text'])})],'code_coverage':'not measured','generated_at':now(),'caveat':('Synthetic academic demo only. Instructor scenario pack not supplied. P1/P2 enterprise controls are roadmap items.' if p['demo'] else 'Imported repository analysis only. No isolated execution adapter is enabled for this project.')}
+@app.get('/api/projects/{project_id}/workspace')
+def workspace(project_id:str):
+    # A single gateway round trip supplies initial project data. Large activity
+    # traces are loaded only when the configuration/proof screen is opened.
+    get('project',project_id)
+    summary=runs(project_id,summary=True)
+    report_data=report(project_id)
+    compact={row['id']:row for row in summary}
+    report_data['runs']=[compact[row['id']] for row in report_data['runs']]
+    return {'runs':summary,'plans':plans(project_id),
+            'evidence':evidence(project_id),'report':report_data,
+            'memory':memory(project_id)}
+
 @app.get('/api/reports/{project_id}.pdf')
 def pdf_report(project_id:str):
     from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Table,TableStyle

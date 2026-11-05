@@ -17,7 +17,8 @@
     "test:system": ".venv/bin/python -m pytest tests/system -q",
     "test:browser": "node scripts/browser-qa.mjs",
     "test:live": ".venv/bin/python scripts/live-smoke.py",
-    "build:vercel": "node scripts/package-backend.mjs && next build"
+    "build:vercel": "node scripts/package-backend.mjs && next build",
+    "test:performance": "node scripts/performance-qa.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

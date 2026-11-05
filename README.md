@@ -132,3 +132,7 @@ Required skipped tests produce INCOMPLETE evidence and cannot produce GO, even i
 ## Hosted cloud version
 
 See `DEPLOYMENT.md` for the full Vercel architecture. The hosted version runs its Python agent, MCP runner, databases, vectors and artifacts in a persistent Vercel Sandbox, with a protected Next.js gateway. It does not depend on a laptop backend. Use browser folder or ZIP upload in cloud mode; typed local paths remain a local-only feature. Vercel Authentication protects the shared workspace.
+
+## Smoother scrolling and guided workflow
+
+The overview now includes a next-step guide for requirements, plans, approval, results and reports. The interactive 3D map starts paused; use Play to animate, drag or arrow keys to rotate, and the controls to zoom. Animation pauses off-screen and during scrolling. Transparent cards use one blurred wallpaper layer. Run summaries load first, with original logs and assertions fetched when a run is opened. See `PERFORMANCE.md` for the measured comparison and `npm run test:performance` for repeatable browser checks.

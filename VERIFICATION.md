@@ -6,7 +6,7 @@ Verified on **6 November 2026 (Asia/Karachi)** against the running local applica
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Platform regression tests | **59 passed** | `output/qa/system-tests.xml` |
+| Platform regression tests | **62 passed** | `output/qa/system-tests.xml` |
 | TypeScript | Passed | `npm run typecheck` |
 | Production build | Passed | `npm run build` |
 | Desktop/mobile screens | **19 passed**, no page-wide overflow | `output/qa/browser-verification.json` |
@@ -52,7 +52,7 @@ These results verify the implemented single-user local academic MVP. Imported ar
 
 ## Broader bug audit
 
-The regression suite now contains 59 passing cases. Additional fixes cover:
+The regression suite now contains 62 passing cases. Additional fixes cover:
 
 - Empty/blank specification files and uppercase extensions no longer break document parsing or disappear from detection.
 - Corrupt/encrypted/unsupported ZIP entries produce validation errors.
@@ -69,3 +69,7 @@ The regression suite now contains 59 passing cases. Additional fixes cover:
 The delayed-transcript browser regression passed (`output/qa/session-race.json`). The live smoke harness now waits for concurrent runs to settle before asserting the final report, instead of treating a correctly provisional verdict as an application failure.
 
 The live audit also exposed intermittent model misclassification of an explicit plan request. Clear current-turn plan requests now route deterministically to pending-plan creation; explicit requests not to create a plan remain explanations. Both paths have regression tests. Execution still requires a separate approval.
+
+## Scrolling and usability update
+
+The latest revision passes 62 platform cases, the live NVIDIA/RAG/MCP smoke flow, 19 desktop/mobile screens, 16 browser workflow groups and 11 focused performance/usability checks. The overview provides a next-step guide, on-demand 3D animation, lighter transparent surfaces, compact progress polling and lazy original-run evidence. The focused browser check records zero off-screen SVG animation mutations and no page errors. See `PERFORMANCE.md` and `output/qa/performance-verification.json`. Existing ESLint backlog is documented separately; this is not a claim of a lint-clean repository.

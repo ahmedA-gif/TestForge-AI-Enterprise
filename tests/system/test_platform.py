@@ -309,3 +309,35 @@ def test_cloud_backend_requires_gateway_auth_and_blocks_host_paths(monkeypatch):
         assert result.status_code==200 and result.json()['hosting']=='cloud'
         assert result.json()['local_directory']=={'enabled':False,'allowed_roots':[]}
         assert c.post('/api/projects/import/local',headers=headers,json={'path':'/tmp'}).status_code==400
+
+def test_workspace_loads_project_data_without_activity_traces(demo):
+    from fastapi.testclient import TestClient
+    from services.api import app
+    plan=put('plan',{'id':uid(),'project_id':demo['id'],'state':'pending','suite_id':'checkout_py_smoke'},demo['id'])
+    with TestClient(app,base_url='http://127.0.0.1:8010',client=('127.0.0.1',44000)) as client:
+        response=client.get('/api/projects/'+demo['id']+'/workspace')
+        assert response.status_code==200
+        data=response.json()
+        assert data['report']['project_id']==demo['id']
+        assert len(data['evidence']['documents'])==6
+        assert any(item['id']==plan['id'] for item in data['plans'])
+        assert 'activity' not in data
+        assert all('stdout' not in row and 'cases' not in row for row in data['runs'])
+        assert all('stdout' not in row and 'cases' not in row for row in data['report']['runs'])
+        assert client.get('/api/projects/missing/workspace').status_code==422
+
+def test_progress_poll_omits_heavy_logs_but_preserves_original_run(demo):
+    from fastapi.testclient import TestClient
+    from services.api import app
+    run=put('run',{'id':uid(),'project_id':demo['id'],'suite_id':'checkout_py_smoke','status':'FAIL',
+                  'counts':{'passed':4,'failed':1},'stdout':'x'*100_000,'stderr':'original stderr',
+                  'cases':[{'name':'expired coupon','failure':'actual assertion'}],'artifacts':['junit.xml']},demo['id'])
+    with TestClient(app,base_url='http://127.0.0.1:8010',client=('127.0.0.1',44000)) as client:
+        progress=client.get('/api/projects/'+demo['id']+'/runs?summary=true')
+        assert progress.status_code==200
+        compact=next(item for item in progress.json() if item['id']==run['id'])
+        assert compact['status']=='FAIL' and compact['counts']['failed']==1
+        assert not {'stdout','stderr','cases','artifacts'} & compact.keys()
+        original=client.get('/api/runs/'+run['id']).json()
+        assert original['stdout']==run['stdout'] and original['cases']==run['cases']
+        assert len(progress.content)<len(client.get('/api/projects/'+demo['id']+'/runs').content)

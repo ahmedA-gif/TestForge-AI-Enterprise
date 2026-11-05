@@ -9,7 +9,7 @@ await fs.mkdir(path.join(root,'node_modules'),{recursive:true});
 await fs.writeFile(path.join(root,'.env'),'PRIVATE_TEST_VALUE=excluded');
 await fs.writeFile(path.join(root,'node_modules','dependency.js'),'x'.repeat(4*1024*1024));
 await fs.writeFile(path.join(root,'README.md'),'# Local project\nA real local QA inventory.');
-for(let i=0;i<110;i++)await fs.writeFile(path.join(root,`module_${i}.py`),`def function_${i}(): return ${i}\n`);
+for(let i=0;i<110;i++)await fs.writeFile(path.join(root,`module_${i}.py`),i===0?'def broken(:\n pass':`def function_${i}(): return ${i}\n`);
 const browser=await pw.chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const result={checks:[],errors:[],createdProjects:[]};page.on('pageerror',e=>result.errors.push(e.message));
 try{
@@ -36,6 +36,8 @@ await page.getByRole('button',{name:'Read latest files'}).click();const fresh=aw
 assert.notEqual(fresh.id,local.id);assert.equal(fresh.files.length,112);assert.equal(fresh.languages.TypeScript,1);assert.notEqual(fresh.snapshot,local.snapshot);
 await page.getByPlaceholder('Filter files…').fill('new-feature');await page.getByText('new-feature.ts',{exact:true}).waitFor();result.checks.push('Read latest files imports changed local directory and shows the new file without demo data');
 await page.getByRole('button',{name:'Overview',exact:true}).click();await page.locator('.workspace-loading').waitFor({state:'hidden'});
+await page.getByRole('region',{name:'Local source analysis results'}).waitFor();
+assert.equal(fresh.analysis.checked_files,110);assert.equal(fresh.analysis.issues.length,1);await page.getByText('module_0.py:1',{exact:true}).waitFor();result.checks.push('Project-specific source results reflect imported files, with no fabricated test execution');
 const filters=await page.evaluate(()=>Array.from(document.querySelectorAll('*')).filter(el=>{const s=getComputedStyle(el);return s.backdropFilter&&s.backdropFilter!=='none'}).length);assert.equal(filters,0);
 const background=await page.evaluate(()=>getComputedStyle(document.body,'::before').filter);assert.equal(background,'none');result.checks.push('Zero live backdrop filters or wallpaper blur');
 const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});

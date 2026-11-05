@@ -46,7 +46,7 @@ def demo():return create_demo()
 async def upload(file:UploadFile=File(...)):
     raw=await file.read(10*1024*1024+1)
     if len(raw)>10*1024*1024:raise HTTPException(413,'Archive exceeds 10 MB quota')
-    return import_zip(raw,file.filename or 'Uploaded repository')
+    return await asyncio.to_thread(import_zip,raw,file.filename or 'Uploaded repository')
 class LocalImportRequest(BaseModel):
     path:str=Field(min_length=1,max_length=4096)
 @app.post('/api/projects/import/local',status_code=201)
@@ -68,12 +68,17 @@ async def import_folder(files:list[UploadFile]=File(...),paths:str=Form(...)):
             content=await file.read(2*1024*1024+1);total+=len(content)
             if len(content)>2*1024*1024 or total>25*1024*1024:raise ValueError('Folder exceeds 2 MB/file or 25 MB total quota')
             bundle.writestr(name,content)
-    p=import_zip(buffer.getvalue(),'Selected folder')
+    p=await asyncio.to_thread(import_zip,buffer.getvalue(),'Selected folder')
     roots={name.split('/')[0] for name in names if '/' in name}
     if len(roots)==1:p['name']=next(iter(roots))[:100]
     p['import_method']='folder_upload';return put('project',p)
 @app.get('/api/projects/{project_id}')
-def project(project_id:str):return get('project',project_id)
+def project(project_id:str):
+    p=get('project',project_id)
+    if 'analysis' not in p:
+        from services.source_analysis import analyze_source
+        p['analysis']=analyze_source(p['path'],p['files']);put('project',p)
+    return p
 @app.get('/api/projects/{project_id}/evidence')
 def evidence(project_id:str):
     p=get('project',project_id)
@@ -169,20 +174,20 @@ def delete_memory(project_id:str,key:str):
 def activity(project_id:str):return {'audit':all_records('audit')[:100],'mcp':all_records('mcp_trace',project_id)[:10],'llm':all_records('llm_trace',project_id)[:10]}
 @app.get('/api/projects/{project_id}/report')
 def report(project_id:str):
-    p=get('project',project_id);rs=all_records('run',project_id);latest=latest_runs(rs);cases=[c for r in latest.values() for c in r.get('cases',[])]
+    p=project(project_id);rs=all_records('run',project_id);latest=latest_runs(rs);cases=[c for r in latest.values() for c in r.get('cases',[])]
     counts={k:sum(r.get('counts',{}).get(k,0) for r in latest.values()) for k in ['passed','failed','errors','skipped']}
     mapped={req for s in p['suites'] if s['id'] in latest for req in s['requirements']}
-    return {'project':p['name'],'project_id':p['id'],'snapshot':p['snapshot'],'verdict':gate(rs,p['suites']),'counts':counts,'runs':list(latest.values()),'traceability':[{'requirement':req,'mapped':req in mapped,'suite_ids':[s['id'] for s in p['suites'] if req in s['requirements']]} for req in sorted({match for doc in documents(p) for match in re.findall(r'\b(?:R|REQ)-\d+\b',doc['text'])})],'code_coverage':'not measured','generated_at':now(),'caveat':('Synthetic academic demo only. Instructor scenario pack not supplied. P1/P2 enterprise controls are roadmap items.' if p['demo'] else 'Imported repository analysis only. No isolated execution adapter is enabled for this project.')}
+    return {'project':p['name'],'project_id':p['id'],'snapshot':p['snapshot'],'verdict':gate(rs,p['suites']),'counts':counts,'runs':list(latest.values()),'traceability':[{'requirement':req,'mapped':req in mapped,'suite_ids':[s['id'] for s in p['suites'] if req in s['requirements']]} for req in sorted({match for doc in documents(p) for match in re.findall(r'\b(?:R|REQ)-\d+\b',doc['text'])})],'source_analysis':p.get('analysis'),'code_coverage':'not measured','generated_at':now(),'caveat':('Synthetic academic demo only. Instructor scenario pack not supplied. P1/P2 enterprise controls are roadmap items.' if p['demo'] else 'Imported repository analysis only. No isolated execution adapter is enabled for this project.')}
 @app.get('/api/projects/{project_id}/workspace')
 def workspace(project_id:str):
     # A single gateway round trip supplies initial project data. Large activity
     # traces are loaded only when the configuration/proof screen is opened.
-    get('project',project_id)
+    current_project=project(project_id)
     summary=runs(project_id,summary=True)
     report_data=report(project_id)
     compact={row['id']:row for row in summary}
     report_data['runs']=[compact[row['id']] for row in report_data['runs']]
-    return {'runs':summary,'plans':plans(project_id),
+    return {'project':current_project,'runs':summary,'plans':plans(project_id),
             'evidence':evidence(project_id),'report':report_data,
             'memory':memory(project_id)}
 

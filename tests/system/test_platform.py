@@ -341,3 +341,16 @@ def test_progress_poll_omits_heavy_logs_but_preserves_original_run(demo):
         original=client.get('/api/runs/'+run['id']).json()
         assert original['stdout']==run['stdout'] and original['cases']==run['cases']
         assert len(progress.content)<len(client.get('/api/projects/'+demo['id']+'/runs').content)
+
+def test_import_source_results_are_measured_not_execution():
+    p=import_zip(archive([('broken.py','def broken(:\n pass'),('config.json','{"broken":}'),('test_ok.py','def test_ok(): pass'),('README.md','# Requirements')]),'source checks')
+    result=p['analysis']
+    assert result['files']==4 and result['checked_files']==3
+    assert {i['path'] for i in result['issues']}=={'broken.py','config.json'}
+    assert result['test_files']==['test_ok.py'] and result['documentation_files']==1
+    assert p['suites']==[]
+
+def test_import_excludes_caches_and_case_insensitive_secrets():
+    p=import_zip(archive([('.next/generated.js','x'),('.ENV.local','secret'),('main.ts','export const x=1')]),'filtered')
+    assert [f['path'] for f in p['files']]==['main.ts']
+    assert p['analysis']['checked_files']==0

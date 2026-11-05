@@ -1,7 +1,8 @@
 import io,zipfile,stat,hashlib,json,os,zlib
 from pathlib import Path,PurePosixPath
 from services.store import *
-IGNORE={'.git','node_modules','dist','build','.venv','venv','__pycache__','.pytest_cache'}
+from services.source_analysis import analyze_source
+IGNORE={'.git','node_modules','dist','build','.venv','venv','__pycache__','.pytest_cache','.next','.nuxt','.cache','coverage','.wrangler','.sites-runtime','.vinext'}
 EXT={'.py':'Python','.ts':'TypeScript','.tsx':'TypeScript','.js':'JavaScript','.jsx':'JavaScript','.java':'Java','.cs':'C#','.go':'Go','.cpp':'C++','.rs':'Rust','.mts':'TypeScript','.cts':'TypeScript','.mjs':'JavaScript','.cjs':'JavaScript'}
 SUITES=[{'id':'checkout_py_smoke','name':'Backend smoke checks','framework':'Pytest','language':'Python','source':'fixtures/checkout_py/test_checkout.py','requirements':['R-01','R-02','R-03','R-04','R-05'],'timeout':30}, {'id':'checkout_ts_regression','name':'Frontend regression checks','framework':'Vitest','language':'TypeScript','source':'fixtures/checkout_ts/checkout.test.ts','requirements':['R-01','R-05','R-06'],'timeout':30}]
 def create_demo():
@@ -22,8 +23,9 @@ def inventory(path,name,demo=False):
             import ast
             try:
                 tree=ast.parse(p.read_text());symbols.extend({'name':n.name,'path':rel,'line':n.lineno} for n in ast.walk(tree) if isinstance(n,(ast.FunctionDef,ast.ClassDef,ast.AsyncFunctionDef)))
-            except (SyntaxError,UnicodeError):pass
+            except (SyntaxError,UnicodeError,ValueError,RecursionError):pass
     data={'id':uid(),'name':name[:100],'path':str(path),'demo':demo,'snapshot':snapshot(path),'files':files,'languages':counts,'symbols':symbols,'suites':SUITES if demo else [],'created_at':now(),'warnings':[] if demo else ['Analysis only: uploaded code cannot execute on this host.'],'status':'discovered'}
+    data['analysis']=analyze_source(path,files)
     audit('project.import',data['id']);return put('project',data)
 
 def import_zip(raw,name):
@@ -60,7 +62,7 @@ def local_roots():
 
 def ignored_path(parts):
     private_names={'credentials.json','secrets.json','id_rsa','id_ed25519','.npmrc','.pypirc'}
-    return any(part in IGNORE or part.startswith('.env') or part.lower() in private_names for part in parts) or Path(parts[-1]).suffix.lower() in {'.pem','.key','.p12','.exe','.dll','.so'}
+    return any(part in IGNORE or part.lower().startswith('.env') or part.lower() in private_names for part in parts) or Path(parts[-1]).suffix.lower() in {'.pem','.key','.p12','.exe','.dll','.so'}
 
 def import_local_directory(raw_path):
     """Copy bounded regular files from an allowed local directory; never execute."""

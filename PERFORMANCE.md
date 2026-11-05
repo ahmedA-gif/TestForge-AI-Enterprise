@@ -37,3 +37,13 @@ Validation: 62 platform tests, 13 existing performance/workflow checks, and scri
 Local development also excludes data/output/logs/venv from Vite watching and TypeScript compilation. Tailwind scans only app/components; importing source or writing test artifacts must not trigger UI style rebuilds. This prevents imported TypeScript from being compiled as application code.
 
 After excluding generated files from watching, the repeat local import/browser check passed without hot reloads. The same 100-frame, 4× CPU-throttled sample recorded p95 24 ms and maximum 38 ms. Both samples are diagnostic, not a controlled cross-device benchmark.
+
+## Project-specific source findings
+
+Imports now retain deterministic source findings: file/byte/document counts, test-file discovery, Python AST syntax errors and JSON parsing errors with path/line locations. The overview shows these for the selected imported project; no execution, coverage or release success is inferred. Existing imports are analyzed when fetched. Report JSON/export includes source analysis.
+
+Fixed silent Python syntax-error loss, cache/private-file filter mismatches (including uppercase .ENV names), and duplicate initial inventory requests by including project metadata in the workspace response. Archive inventory/parsing runs off the API event loop. Supported parsing is deliberately limited to Python and JSON; other languages remain inventory-only.
+
+Validation: 64 platform checks, local folder import/update browser checks including an actual malformed Python file, and focused lint on the results/guide components. Repository-wide lint still has the previously documented backlog; this is not a claim that all possible defects are eliminated.
+
+The full browser run passed all 19 desktop/mobile views and 16 workflow groups, including actual approval/MCP execution, original evidence, PDF/ZIP exports, memory, reduced motion and no browser exceptions or HTTP 5xx responses.

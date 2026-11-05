@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": "24.x"
   },
   "scripts": {
     "install:ci": "node scripts/install-ci.mjs",
@@ -16,12 +16,14 @@
     "api": ".venv/bin/uvicorn services.api:app --host 127.0.0.1 --port 8010",
     "test:system": ".venv/bin/python -m pytest tests/system -q",
     "test:browser": "node scripts/browser-qa.mjs",
-    "test:live": ".venv/bin/python scripts/live-smoke.py"
+    "test:live": ".venv/bin/python scripts/live-smoke.py",
+    "build:vercel": "node scripts/package-backend.mjs && next build"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
     "@shadcn/react": "^0.3.0",
+    "@vercel/sandbox": "^3.9.1",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "^1.1.1",

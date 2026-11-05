@@ -1,4 +1,4 @@
-import asyncio,json,time,os,io,zipfile,re
+import asyncio,json,time,os,io,zipfile,re,secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI,HTTPException,UploadFile,File,Form,BackgroundTasks,Request
@@ -23,6 +23,13 @@ async def lifespan(app):
 app=FastAPI(title='TestForge AI control plane',lifespan=lifespan)
 @app.middleware('http')
 async def local_boundary(request:Request,call_next):
+    if os.getenv('TESTFORGE_CLOUD')=='1':
+        expected=os.getenv('TESTFORGE_BACKEND_TOKEN','')
+        supplied=request.headers.get('x-testforge-backend-token','')
+        if not expected or not secrets.compare_digest(expected,supplied):return JSONResponse({'detail':'Backend authentication required'},403)
+        if request.url.path=='/api/projects/import/local':return JSONResponse({'detail':'Cloud hosting cannot read a local computer path. Use folder or ZIP upload.'},400)
+        try:return await call_next(request)
+        except ValueError as exc:return JSONResponse({'detail':str(exc),'status':'error'},422)
     host=request.url.hostname
     if host not in {'127.0.0.1','localhost','::1'}:return JSONResponse({'detail':'Local host required'},403)
     origin=request.headers.get('origin','')
@@ -30,7 +37,7 @@ async def local_boundary(request:Request,call_next):
     try:return await call_next(request)
     except ValueError as exc:return JSONResponse({'detail':str(exc),'request_id':uid(),'status':'error'},422)
 @app.get('/api/health')
-def health():return {'status':'ready','provider_configured':bool(os.getenv('NVIDIA_API_KEY')),'model':os.getenv('NVIDIA_CHAT_MODEL'),'mcp':'2.x / stdio','execution':'Audited fixtures only','local_directory':{'enabled':True,'allowed_roots':[str(p) for p in local_roots()]}}
+def health():return {'status':'ready','hosting':'cloud' if os.getenv('TESTFORGE_CLOUD')=='1' else 'local','provider_configured':bool(os.getenv('NVIDIA_API_KEY')),'model':os.getenv('NVIDIA_CHAT_MODEL'),'mcp':'2.x / stdio','execution':'Audited fixtures only','local_directory':{'enabled':os.getenv('TESTFORGE_CLOUD')!='1','allowed_roots':[] if os.getenv('TESTFORGE_CLOUD')=='1' else [str(p) for p in local_roots()]}}
 @app.get('/api/projects')
 def projects():return all_records('project')
 @app.post('/api/projects/demo')

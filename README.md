@@ -128,3 +128,7 @@ Fixed project stack badges, prominent snapshot hashes, demo-specific prompt sugg
 With the local app running, `npm run test:live` verifies the real NVIDIA → retrieval → agent → approval → MCP → Pytest/Vitest → memory → report flow. `npm run test:browser` exercises desktop/mobile screens, 3D/charts, imports, citations, memory, appearance settings, approval/rejection, actual test execution and exports. Browser results are written to `output/qa/browser-verification.json`, including failures. It requires Playwright from a local install or the Codex bundled runtime; `TESTFORGE_PLAYWRIGHT_MODULE` can override that module path.
 
 Required skipped tests produce INCOMPLETE evidence and cannot produce GO, even if a runner exits with code zero. The current verification details and any limits are recorded in `VERIFICATION.md`.
+
+## Hosted cloud version
+
+See `DEPLOYMENT.md` for the full Vercel architecture. The hosted version runs its Python agent, MCP runner, databases, vectors and artifacts in a persistent Vercel Sandbox, with a protected Next.js gateway. It does not depend on a laptop backend. Use browser folder or ZIP upload in cloud mode; typed local paths remain a local-only feature. Vercel Authentication protects the shared workspace.

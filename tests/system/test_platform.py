@@ -296,3 +296,16 @@ def test_explicit_plan_intent_overrides_model_misclassification(demo,monkeypatch
     result=agent.chat(demo['id'],uid(),query)
     assert bool(result.get('plan'))==should_plan
     if should_plan:assert result['plan']['state']=='pending' and result['plan']['suite_id']=='checkout_py_smoke'
+
+def test_cloud_backend_requires_gateway_auth_and_blocks_host_paths(monkeypatch):
+    from fastapi.testclient import TestClient
+    from services.api import app
+    monkeypatch.setenv('TESTFORGE_CLOUD','1');monkeypatch.setenv('TESTFORGE_BACKEND_TOKEN','test-only-gateway-key')
+    with TestClient(app,base_url='https://cloud.example',client=('127.0.0.1',44000)) as c:
+        assert c.get('/api/health').status_code==403
+        assert c.get('/api/health',headers={'x-testforge-backend-token':'wrong'}).status_code==403
+        headers={'x-testforge-backend-token':'test-only-gateway-key'}
+        result=c.get('/api/health',headers=headers)
+        assert result.status_code==200 and result.json()['hosting']=='cloud'
+        assert result.json()['local_directory']=={'enabled':False,'allowed_roots':[]}
+        assert c.post('/api/projects/import/local',headers=headers,json={'path':'/tmp'}).status_code==400

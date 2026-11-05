@@ -1,9 +1,9 @@
 """Real provider + API integration proof. Runs only audited bundled fixtures."""
-import httpx,json,time
+import httpx,json,time,os
 from pathlib import Path
-BASE='http://127.0.0.1:8010/api';ROOT=Path(__file__).resolve().parents[1];LOG=ROOT/'logs';LOG.mkdir(exist_ok=True)
+BASE=os.getenv('TESTFORGE_API_BASE_URL','http://127.0.0.1:8010/api');ROOT=Path(__file__).resolve().parents[1];LOG=ROOT/'logs';LOG.mkdir(exist_ok=True)
 def save(name,data): (LOG/name).write_text(json.dumps(data,indent=2))
-with httpx.Client(timeout=180) as c:
+with httpx.Client(timeout=240,headers=({'x-testforge-backend-token':os.environ['TESTFORGE_BACKEND_TOKEN']} if os.getenv('TESTFORGE_API_BASE_URL') and os.getenv('TESTFORGE_BACKEND_TOKEN') else {})) as c:
  def request(method,path,body=None):
   r=c.request(method,BASE+path,json=body)
   if r.is_error:raise RuntimeError(f'{path}: HTTP {r.status_code}: {r.text[:1500]}')

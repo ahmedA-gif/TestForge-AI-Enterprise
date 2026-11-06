@@ -264,7 +264,7 @@ def test_invalid_embeddings_fail_closed(monkeypatch,payload):
 def test_uppercase_file_extensions_are_detected_and_read():
     from services.rag import documents
     p=import_zip(archive([('MAIN.TS','export const x=1;'),('SPEC.MD','# Uppercase\nREQ-8: works')]),'upper')
-    assert p['languages']['TypeScript']==1;assert len(documents(p))==1
+    assert p['languages']['TypeScript']==1;assert {d['source_path'] for d in documents(p)}=={'MAIN.TS','SPEC.MD'}
 
 def test_concurrent_approve_and_reject_have_one_winner(demo):
     import threading
@@ -354,3 +354,23 @@ def test_import_excludes_caches_and_case_insensitive_secrets():
     p=import_zip(archive([('.next/generated.js','x'),('.ENV.local','secret'),('main.ts','export const x=1')]),'filtered')
     assert [f['path'] for f in p['files']]==['main.ts']
     assert p['analysis']['checked_files']==0
+
+def test_source_only_project_can_select_and_index(monkeypatch):
+    import services.rag as rag
+    p=import_zip(archive([('main.py','def actual(): return 3'),('other.py','x=4')]),'code only')
+    docs=rag.documents(p);assert len(docs)==2 and docs[0]['kind']=='source code'
+    async def embed(texts,kind):return [[1.0,0.0] for _ in texts]
+    monkeypatch.setattr(rag,'embeddings',embed)
+    result=asyncio.run(rag.index(p['id'],[docs[0]['id']]))
+    assert [d['source_path'] for d in result['documents']]==['main.py']
+    found=asyncio.run(rag.retrieve(p['id'],'actual'));assert found[0]['source_path']=='main.py'
+    with pytest.raises(ValueError,match='does not belong'):asyncio.run(rag.index(p['id'],['foreign']))
+    with pytest.raises(ValueError,match='Choose between'):asyncio.run(rag.index(p['id'],[]))
+
+def test_memory_note_does_not_need_index(demo):
+    from fastapi.testclient import TestClient
+    from services.api import app
+    with TestClient(app,base_url='http://127.0.0.1:8010',client=('127.0.0.1',45678)) as c:
+        assert c.post(f"/api/projects/{demo['id']}/memory",json={'value':'Focus on validation'}).status_code==200
+        assert any(row['value']=='Focus on validation' for row in c.get(f"/api/projects/{demo['id']}/memory").json())
+        assert c.post(f"/api/projects/{demo['id']}/memory",json={'value':'   '}).status_code==422

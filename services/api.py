@@ -85,8 +85,10 @@ def evidence(project_id:str):
     try:idx=get('index',project_id)
     except ValueError:idx=None
     return {'documents':documents(p),'index':idx,'retrievals':all_records('retrieval',project_id)[:10]}
+class IndexRequest(BaseModel):
+    source_ids:list[str]|None=None
 @app.post('/api/projects/{project_id}/index')
-async def index_project(project_id:str):return await index(project_id)
+async def index_project(project_id:str,q:IndexRequest|None=None):return await index(project_id,q.source_ids if q else None)
 class Query(BaseModel):
     query:str=Field(min_length=1,max_length=3000)
 @app.post('/api/projects/{project_id}/retrieve')
@@ -164,6 +166,16 @@ def artifact(run_id:str,name:str):
     path=DATA/'artifacts'/run_id/name
     if not path.is_file():raise HTTPException(404)
     return FileResponse(path,filename=name)
+class MemoryNote(BaseModel):
+    value:str=Field(min_length=1,max_length=1000)
+@app.post('/api/projects/{project_id}/memory')
+def save_memory_note(project_id:str,q:MemoryNote):
+    get('project',project_id)
+    value=q.value.strip()
+    if not value:raise ValueError('Enter a project note')
+    with db() as c:c.execute('INSERT OR REPLACE INTO memories VALUES(?,?,?,?)',(project_id,'project_note',value,now()))
+    audit('memory.save',project_id)
+    return {'saved':True,'key':'project_note'}
 @app.get('/api/projects/{project_id}/memory')
 def memory(project_id:str):return memories(project_id)
 @app.delete('/api/projects/{project_id}/memory/{key}')

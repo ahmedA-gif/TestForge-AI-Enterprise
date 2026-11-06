@@ -15,6 +15,9 @@ def context(s):
     p=get('project',s['project_id']);runs=all_records('run',p['id']);mem=memories(p['id'])
     return {'context':{'project':{k:v for k,v in p.items() if k not in ['path','files']},'runs':runs[:6],'memories':mem,'verdict':gate(runs,p['suites'])},'trace':s['trace']+['load_context']}
 def retrieval(s):
+    if re.search(r'\b(?:prefer|preferred|remember)\b',s['query'],re.I):return {'evidence':[],'trace':s['trace']+['memory: retrieval not required']}
+    try:get('index',s['project_id'])
+    except ValueError:return {'evidence':[],'trace':s['trace']+['retrieval: not indexed; inventory context only']}
     try:evidence=asyncio.run(retrieve(s['project_id'],s['query']))
     except ValueError as e:evidence=[{'error':str(e)}]
     return {'evidence':evidence,'trace':s['trace']+['retrieve_evidence']}

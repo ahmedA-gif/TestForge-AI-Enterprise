@@ -33,20 +33,25 @@ async def embeddings(texts,kind):
     return vectors
 
 def documents(project):
-    paths=sorted((ROOT/'knowledge/demo').glob('*.md')) if project['demo'] else [Path(project['path'])/f['path'] for f in project['files'] if Path(f['path']).suffix.lower() in {'.md','.txt'}]
+    paths=sorted((ROOT/'knowledge/demo').glob('*.md')) if project['demo'] else [Path(project['path'])/f['path'] for f in project['files'] if Path(f['path']).suffix.lower() in {'.md','.txt','.py','.ts','.tsx','.js','.jsx','.json','.go','.rs','.java','.cs','.cpp','.yaml','.yml'}]
+    if not project['demo']:paths=sorted(paths,key=lambda p:(p.suffix.lower() not in {'.md','.txt'},str(p)))
     docs=[]
     for i,p in enumerate(paths[:100]):
         text=p.read_text(errors='replace')
-        docs.append({'id':p.stem.split('-')[0] if project['demo'] else f'D{i+1}','title':next((line.lstrip('# ').strip() for line in text.splitlines() if line.strip()),p.stem),'source_path':str(p.relative_to(ROOT)) if project['demo'] else str(p.relative_to(project['path'])),'text':text[:50000],'revision':hashlib.sha256(text.encode()).hexdigest()})
+        docs.append({'id':p.stem.split('-')[0] if project['demo'] else f'D{i+1}','title':next((line.lstrip('# ').strip() for line in text.splitlines() if line.strip()),p.stem),'source_path':str(p.relative_to(ROOT)) if project['demo'] else str(p.relative_to(project['path'])),'text':text[:50000 if p.suffix.lower() in {'.md','.txt'} else 6000],'kind':'document' if p.suffix.lower() in {'.md','.txt'} else 'source code','truncated':len(text)>(50000 if p.suffix.lower() in {'.md','.txt'} else 6000),'revision':hashlib.sha256(text.encode()).hexdigest()})
     return docs
 
-async def index(project_id):
+async def index(project_id,source_ids=None):
     p=get('project',project_id);docs=documents(p);chunks=[]
+    if source_ids is not None:
+        if not source_ids or len(source_ids)>20:raise ValueError('Choose between 1 and 20 sources to index')
+        if set(source_ids)-{d['id'] for d in docs}:raise ValueError('Selected source does not belong to this project')
+        docs=[d for d in docs if d['id'] in source_ids]
     for d in docs:
         lines=d['text'].splitlines()
         for start in range(0,len(lines),30):
             quote='\n'.join(lines[start:start+35]);chunks.append({**d,'chunk_id':f"{d['id']}:{start+1}",'lines':[start+1,min(start+35,len(lines))],'quote':quote,'project_id':project_id})
-    if not chunks:raise ValueError('No approved documents to index')
+    if not chunks:raise ValueError('Selected sources contain no indexable text. Choose a non-empty code or document file.')
     vectors=await embeddings([x['quote'] for x in chunks],'passage');dim=len(vectors[0])
     if not dim or any(len(v)!=dim for v in vectors):raise ValueError('Embedding dimension mismatch')
     q=client();name='p_'+project_id+'_'+uid()
@@ -61,7 +66,10 @@ async def index(project_id):
     return result
 
 async def retrieve(project_id,query):
-    idx=get('index',project_id);vector=(await embeddings([query],'query'))[0]
+
+    try:idx=get('index',project_id)
+    except ValueError:raise ValueError('Choose source files in Knowledge and index them before searching')
+    vector=(await embeddings([query],'query'))[0]
     if len(vector)!=idx['dimension']:raise ValueError('Embedding model dimension changed; reindex required')
     results=client().query_points(idx.get('collection','p_'+project_id),query=vector,limit=5).points
     evidence=[{**x.payload,'score':round(x.score,4)} for x in results]

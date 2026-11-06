@@ -55,3 +55,11 @@ The default overview now leaves the 3D subtree unmounted; Open 3D map mounts it 
 Added start-local-production.sh: optimized Next build + loopback FastAPI, without Vite/HMR. The server-only local proxy is explicitly enabled and is disabled on Vercel. Production verification caught and fixed localhost/127.0.0.1 origin mismatch for uploads/approval; unrelated origins remain rejected.
 
 Repeated production-mode local import and update check: six checks passed, zero page errors; 100 animation-frame scroll samples at 4× CPU throttling recorded p95 18 ms, max 19 ms. These are test-machine measurements, not a guarantee for every browser/device. Platform: 64 passing tests; production build and TypeScript passed. The assignment implementation/memory mapping is documented in ASSIGNMENT_FEATURES.md.
+
+## Source selection and imported-project navigation
+
+Fixed the source-only Knowledge dead end: supported code files are available alongside documents, with explicit checkbox selection (1–20), bounded code excerpts, live NVIDIA indexing and original-file citations. Existing Markdown/text source ordering is preserved. Search is guarded before indexing. No reupload is needed for existing imported snapshots.
+
+Imported projects hide unavailable approval/run navigation, test-only overview metrics and execution steps. Their report presents source findings instead of a release verdict. Direct links to testing screens explain the execution boundary and return to the current repository. Memory can save an explicit project note without any index; agent preference handling bypasses unnecessary retrieval. Navigation clears stale errors.
+
+Verified a Python-only imported project in the production UI: live NVIDIA embeddings, live cited retrieval, saved note surviving a new thread, reduced navigation and actual analysis report, with zero page exceptions. Static source checks do not execute imported tests; audited demo execution remains separate.

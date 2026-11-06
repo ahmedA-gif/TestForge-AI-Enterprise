@@ -6,7 +6,8 @@ type Data=Record<string,any>;
 const palette=['#caff77','#c2a5ff','#88d5f5','#ffbb9e','#eadb77','#f7a6d5','#a8e1c2'];
 
 function ProjectVisuals({project,documents,runs,onLanguage,onRun}:{project:Data,documents:Data[],runs:Data[],onLanguage:(lang:string)=>void,onRun:(run:Data)=>void}){
- return <><section className="panel visual-universe"><Universe project={project} documents={documents} runs={runs}/></section><div className="visual-charts"><section className="panel"><LanguageChart project={project} onLanguage={onLanguage}/></section><section className="panel"><RunChart runs={runs} suites={project.suites||[]} onRun={onRun}/></section></div></>
+ const [showMap,setShowMap]=useState(false);
+ return <><section className="panel visual-universe"><div className="map-toggle"><div><h2>Project evidence map</h2><p>Open the interactive 3D view when you want to explore relationships.</p></div><button className="btn" aria-expanded={showMap} onClick={()=>setShowMap(value=>!value)}>{showMap?'Close 3D map':'Open 3D map'}</button></div>{showMap&&<Universe project={project} documents={documents} runs={runs}/>}</section><div className="visual-charts"><section className="panel"><LanguageChart project={project} onLanguage={onLanguage}/></section><section className="panel"><RunChart runs={runs} suites={project.suites||[]} onRun={onRun}/></section></div></>
 }
 export default memo(ProjectVisuals);
 type Node={id:string,label:string,kind:string,value:string,detail:string,x:number,y:number,z:number,color:string};

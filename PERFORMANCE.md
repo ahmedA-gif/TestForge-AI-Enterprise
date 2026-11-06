@@ -47,3 +47,11 @@ Fixed silent Python syntax-error loss, cache/private-file filter mismatches (inc
 Validation: 64 platform checks, local folder import/update browser checks including an actual malformed Python file, and focused lint on the results/guide components. Repository-wide lint still has the previously documented backlog; this is not a claim that all possible defects are eliminated.
 
 The full browser run passed all 19 desktop/mobile views and 16 workflow groups, including actual approval/MCP execution, original evidence, PDF/ZIP exports, memory, reduced motion and no browser exceptions or HTTP 5xx responses.
+
+## Production scrolling and local runtime
+
+The default overview now leaves the 3D subtree unmounted; Open 3D map mounts it and Close removes it, including its animation and scroll listeners. Interactive language/run charts remain available. Removed the full-document clipping layer, large outer shadow and fixed wallpaper painting.
+
+Added start-local-production.sh: optimized Next build + loopback FastAPI, without Vite/HMR. The server-only local proxy is explicitly enabled and is disabled on Vercel. Production verification caught and fixed localhost/127.0.0.1 origin mismatch for uploads/approval; unrelated origins remain rejected.
+
+Repeated production-mode local import and update check: six checks passed, zero page errors; 100 animation-frame scroll samples at 4× CPU throttling recorded p95 18 ms, max 19 ms. These are test-machine measurements, not a guarantee for every browser/device. Platform: 64 passing tests; production build and TypeScript passed. The assignment implementation/memory mapping is documented in ASSIGNMENT_FEATURES.md.

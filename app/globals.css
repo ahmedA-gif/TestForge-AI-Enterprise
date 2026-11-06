@@ -87,3 +87,10 @@ body::before{background:linear-gradient(135deg,#b8d6f6 0%,#d6b5ec 48%,#fac1a8 10
 .btn{min-height:42px}.nav-item{min-height:44px}
 @media(max-width:650px){input,textarea,select,.local-import input{font-size:16px}.universe-controls button{width:40px;height:40px}}
 .source-results h2{display:flex;align-items:center;gap:10px}.source-results>p{font-size:12px}.source-results details{margin-top:16px}.source-results summary{cursor:pointer;font-weight:600;padding:8px 0}.source-findings{max-height:320px;overflow:auto}.source-findings button{display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%;text-align:left;border:0;border-bottom:1px solid #ffffff80;background:transparent;padding:13px 0;content-visibility:auto;contain-intrinsic-size:auto 58px}.source-findings strong{overflow-wrap:anywhere;font-size:12px}.source-findings span{flex:1;min-width:160px;font-size:12px}.source-findings svg{flex-shrink:0}
+
+/* Avoid a page-sized clipping/shadow surface; use ordinary document painting. */
+body{background:linear-gradient(135deg,#c7d9ef,#d9c7e7 55%,#efd4c9);background-attachment:scroll;isolation:auto}
+body::before{content:none}
+.app-shell{overflow:visible;box-shadow:none;background:transparent}
+.map-toggle{display:flex;align-items:center;justify-content:space-between;gap:18px}.map-toggle p{font-size:12px;margin-top:8px}.map-toggle+.section-title{margin-top:22px}
+@media(max-width:650px){.map-toggle{align-items:flex-start;flex-direction:column}.map-toggle .btn{width:100%}}

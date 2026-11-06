@@ -14,7 +14,7 @@ const browser=await chromium.launch({headless:true});
 const errors=[];
 const results={checks:[],metrics:{},pageErrors:errors};
 const check=message=>{results.checks.push(message);console.log('PASS',message)};
-async function waitReady(page,url){await page.goto(url);await page.getByRole('heading',{name:'Evidence in three dimensions'}).waitFor({timeout:120000});await page.waitForTimeout(1000)}
+async function waitReady(page,url){await page.goto(url);await page.getByRole('button',{name:'Open 3D map',exact:true}).click();await page.getByRole('heading',{name:'Evidence in three dimensions'}).waitFor({timeout:120000});await page.waitForTimeout(1000)}
 async function measure(url){
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
  await waitReady(page,url);
@@ -68,11 +68,12 @@ try{
  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Toggle navigation'}).click();await page.getByRole('button',{name:'Close navigation'}).click();assert.equal(await page.locator('.sidebar.open').count(),0);
  await page.getByRole('button',{name:'Toggle navigation'}).click();await page.getByRole('button',{name:'Overview',exact:true}).click();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await page.getByRole('button',{name:'Open 3D map',exact:true}).click();
  assert.equal(await page.locator('.universe-svg').evaluate(el=>getComputedStyle(el).touchAction),'pan-y');check('Mobile layout has no horizontal overflow, dismissible navigation and native vertical map scrolling');
  await page.screenshot({path:'output/qa/performance-mobile.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'output/qa/performance-overview.png',fullPage:true});
  const uploaded=await page.request.post(target+'/api/projects/import/folder',{multipart:{files:{name:'main.py',mimeType:'text/plain',buffer:Buffer.from('def sample(): return True\n')},paths:JSON.stringify(['main.py'])}});assert(uploaded.ok());const single=await uploaded.json();results.temporaryProjects=[single.id];
- await page.reload();await page.getByRole('combobox',{name:'Select project'}).selectOption(single.id);await page.waitForFunction(()=>document.querySelectorAll('[data-node]').length===1);
+ await page.reload();await page.getByRole('combobox',{name:'Select project'}).selectOption(single.id);await page.getByRole('button',{name:'Open 3D map',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('[data-node]').length===1);
  await page.locator('.universe-svg').scrollIntoViewIfNeeded();await page.waitForTimeout(250);await page.getByRole('button',{name:'Play 3D rotation'}).click();const singleInitial=await page.locator('[data-node]').getAttribute('transform');await page.waitForFunction(previous=>document.querySelector('[data-node]')?.getAttribute('transform')!==previous,singleInitial,{timeout:5000});check('Single-language imported projects visibly rotate instead of sitting on a fixed pole');
 
  assert.deepEqual(errors,[]);

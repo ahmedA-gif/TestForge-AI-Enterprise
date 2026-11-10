@@ -5,10 +5,12 @@ from fastapi import FastAPI,HTTPException,UploadFile,File,Form,BackgroundTasks,R
 from fastapi.responses import FileResponse,Response,JSONResponse
 from pydantic import BaseModel,Field
 from services.store import *
-from services.projects import create_demo,import_zip,import_local_directory,local_roots,SUITES
+from services.projects import create_demo,import_zip,import_local_directory,local_roots,SUITES,SOURCE_SUITE
 from services.rag import documents,index,retrieve,provider
 from services.agent import chat,execute,graph,config
 from services.runner import gate,latest_runs
+
+BACKEND_REVISION=os.getenv('TESTFORGE_BACKEND_REVISION','local')
 
 @asynccontextmanager
 async def lifespan(app):
@@ -16,6 +18,8 @@ async def lifespan(app):
     for run in all_records('run'):
         if run['status'] in {'PENDING','RUNNING'}:
             run.update({'status':'ERROR','error':'Server restarted before execution completed. Create a fresh approved plan.','finished_at':now()});put('run',run,run['project_id'])
+    from services.specialists import interrupt_pending_reviews
+    interrupt_pending_reviews()
     try:yield
     finally:
         import services.rag as rag
@@ -27,6 +31,7 @@ async def local_boundary(request:Request,call_next):
         expected=os.getenv('TESTFORGE_BACKEND_TOKEN','')
         supplied=request.headers.get('x-testforge-backend-token','')
         if not expected or not secrets.compare_digest(expected,supplied):return JSONResponse({'detail':'Backend authentication required'},403)
+        if request.headers.get('x-testforge-source-revision') and request.headers['x-testforge-source-revision']!=BACKEND_REVISION:return JSONResponse({'detail':'Backend revision mismatch; retry this request.'},409)
         if request.url.path=='/api/projects/import/local':return JSONResponse({'detail':'Cloud hosting cannot read a local computer path. Use folder or ZIP upload.'},400)
         try:return await call_next(request)
         except ValueError as exc:return JSONResponse({'detail':str(exc),'status':'error'},422)
@@ -37,7 +42,7 @@ async def local_boundary(request:Request,call_next):
     try:return await call_next(request)
     except ValueError as exc:return JSONResponse({'detail':str(exc),'request_id':uid(),'status':'error'},422)
 @app.get('/api/health')
-def health():return {'status':'ready','hosting':'cloud' if os.getenv('TESTFORGE_CLOUD')=='1' else 'local','provider_configured':bool(os.getenv('NVIDIA_API_KEY')),'model':os.getenv('NVIDIA_CHAT_MODEL'),'mcp':'2.x / stdio','execution':'Audited fixtures only','local_directory':{'enabled':os.getenv('TESTFORGE_CLOUD')!='1','allowed_roots':[] if os.getenv('TESTFORGE_CLOUD')=='1' else [str(p) for p in local_roots()]}}
+def health():return {'status':'ready','hosting':'cloud' if os.getenv('TESTFORGE_CLOUD')=='1' else 'local','provider_configured':bool(os.getenv('NVIDIA_API_KEY')),'backend_revision':BACKEND_REVISION,'model':os.getenv('NVIDIA_CHAT_MODEL'),'mcp':'2.x / stdio','execution':'Audited fixtures only','local_directory':{'enabled':os.getenv('TESTFORGE_CLOUD')!='1','allowed_roots':[] if os.getenv('TESTFORGE_CLOUD')=='1' else [str(p) for p in local_roots()]}}
 @app.get('/api/projects')
 def projects():return all_records('project')
 @app.post('/api/projects/demo')
@@ -75,6 +80,7 @@ async def import_folder(files:list[UploadFile]=File(...),paths:str=Form(...)):
 @app.get('/api/projects/{project_id}')
 def project(project_id:str):
     p=get('project',project_id)
+    if not p['demo'] and p.get('suites')!=[SOURCE_SUITE]:p['suites']=[dict(SOURCE_SUITE)];put('project',p)
     if 'analysis' not in p:
         from services.source_analysis import analyze_source
         p['analysis']=analyze_source(p['path'],p['files']);put('project',p)
@@ -101,6 +107,18 @@ class ChatRequest(BaseModel):
 async def conversation(q:ChatRequest):
     state=await asyncio.to_thread(chat,q.project_id,q.thread_id,q.message)
     return {k:state.get(k) for k in ['response','evidence','plan','trace','messages','run_ids']}
+@app.get('/api/projects/{project_id}/team')
+def get_team(project_id:str):
+    from services.specialists import latest_team_job,ROLES
+    project(project_id)
+    return {'job':latest_team_job(project_id),'agents':ROLES}
+@app.post('/api/projects/{project_id}/team')
+async def start_team(project_id:str,tasks:BackgroundTasks):
+    from services.specialists import create_team_job,run_team
+    project(project_id)
+    team=create_team_job(project_id)
+    if team['status']=='PENDING':tasks.add_task(run_team,project_id,team['id'])
+    return {'job':team}
 @app.get('/api/projects/{project_id}/threads/{thread_id}')
 def transcript(project_id:str,thread_id:str):
     get('project',project_id);state=graph.get_state(config(project_id,thread_id))
@@ -112,9 +130,9 @@ class PlanRequest(BaseModel):
     thread_id:str=Field(default='manual',min_length=1,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
 @app.post('/api/projects/{project_id}/plans')
 def manual_plan(project_id:str,q:PlanRequest):
-    p=get('project',project_id);suite=next((s for s in p['suites'] if s['id']==q.suite_id),None)
-    if not suite:raise ValueError('Unsupported suite; uploaded repositories are analysis only')
-    return put('plan',{'id':uid(),'project_id':project_id,'suite_id':suite['id'],'snapshot':p['snapshot'],'requirements':suite['requirements'],'thread_id':q.thread_id,'state':'pending','created_at':now(),'risk':'Audited fixture; 30s timeout; isolated credential environment.','reason':'Human-selected regression suite.'},project_id)
+    p=project(project_id);suite=next((s for s in p['suites'] if s['id']==q.suite_id),None)
+    if not suite:raise ValueError('Select an audited suite belonging to the current project')
+    return put('plan',{'id':uid(),'project_id':project_id,'suite_id':suite['id'],'snapshot':p['snapshot'],'requirements':suite['requirements'],'thread_id':q.thread_id,'state':'pending','created_at':now(),'risk':('Source validation only: file integrity and supported syntax parsing.' if not p['demo'] else 'Audited fixture; 30s timeout; isolated credential environment.'),'reason':'Human-selected regression suite.'},project_id)
 async def job(plan,args,rid):
     try:
         state=await asyncio.to_thread(execute,plan['project_id'],plan['thread_id'],args)
@@ -131,7 +149,7 @@ async def approve(plan_id:str,tasks:BackgroundTasks):
         if plan['state']=='approved':return {'run_id':plan['run_id'],'approval_id':plan['approval_id'],'idempotent':True}
         if plan['state']!='pending':raise ValueError('Plan is no longer pending')
         p=get('project',plan['project_id'])
-        if not p['demo'] or snapshot(Path(p['path']))!=plan['snapshot']:raise ValueError('Project snapshot changed or not executable')
+        if (not p['demo'] and plan['suite_id']!='project_source_checks') or snapshot(Path(p['path']))!=plan['snapshot']:raise ValueError('Project snapshot changed or not executable')
         aid=uid();rid=uid();expiry=time.time()+300
         c.execute('INSERT INTO approvals VALUES(?,?,?,?,?,0)',(aid,p['id'],plan['snapshot'],plan['suite_id'],expiry))
         plan.update({'state':'approved','approval_id':aid,'run_id':rid,'expires_at':expiry})
@@ -189,7 +207,7 @@ def report(project_id:str):
     p=project(project_id);rs=all_records('run',project_id);latest=latest_runs(rs);cases=[c for r in latest.values() for c in r.get('cases',[])]
     counts={k:sum(r.get('counts',{}).get(k,0) for r in latest.values()) for k in ['passed','failed','errors','skipped']}
     mapped={req for s in p['suites'] if s['id'] in latest for req in s['requirements']}
-    return {'project':p['name'],'project_id':p['id'],'snapshot':p['snapshot'],'verdict':gate(rs,p['suites']),'counts':counts,'runs':list(latest.values()),'traceability':[{'requirement':req,'mapped':req in mapped,'suite_ids':[s['id'] for s in p['suites'] if req in s['requirements']]} for req in sorted({match for doc in documents(p) for match in re.findall(r'\b(?:R|REQ)-\d+\b',doc['text'])})],'source_analysis':p.get('analysis'),'code_coverage':'not measured','generated_at':now(),'caveat':('Synthetic academic demo only. Instructor scenario pack not supplied. P1/P2 enterprise controls are roadmap items.' if p['demo'] else 'Imported repository analysis only. No isolated execution adapter is enabled for this project.')}
+    return {'project':p['name'],'project_id':p['id'],'snapshot':p['snapshot'],'verdict':gate(rs,p['suites']),'counts':counts,'runs':list(latest.values()),'traceability':[{'requirement':req,'mapped':req in mapped,'suite_ids':[s['id'] for s in p['suites'] if req in s['requirements']]} for req in sorted({match for doc in documents(p) for match in re.findall(r'\b(?:R|REQ)-\d+\b',doc['text'])})],'source_analysis':p.get('analysis'),'code_coverage':'not measured','generated_at':now(),'caveat':('Synthetic academic demo only. Instructor scenario pack not supplied. P1/P2 enterprise controls are roadmap items.' if p['demo'] else 'Source validation measures snapshot integrity and supported parsing. Release readiness requires runtime acceptance evidence.')}
 @app.get('/api/projects/{project_id}/workspace')
 def workspace(project_id:str):
     # A single gateway round trip supplies initial project data. Large activity
@@ -228,6 +246,7 @@ def export(project_id:str):
         z.writestr('report.json',json.dumps(r,indent=2));z.writestr('mcp_trace.json',json.dumps(all_records('mcp_trace',project_id),indent=2))
         z.writestr('audit.json',json.dumps(all_records('audit'),indent=2));z.writestr('llm_trace.json',json.dumps(all_records('llm_trace',project_id),indent=2))
         z.writestr('project_profile.json',json.dumps(get('project',project_id),indent=2))
+        z.writestr('specialist_reviews.json',json.dumps(all_records('team_job',project_id),indent=2))
         for run in r['runs']:
             path=DATA/'artifacts'/run['id']
             if path.exists():

@@ -39,9 +39,9 @@ export default function WorkflowGuide({project,knowledge,plans,runs,busy,navigat
     description = 'Check the selected suite, then approve or reject it. No tests run before approval.';
     label = 'Review test plan'; action = () => navigate('approvals'); Icon = ShieldCheck;
   } else if (!knowledge.documents?.length) {
-    title = 'Add your project requirements';
-    description = 'Import a folder or ZIP with source files and a README or requirements document.';
-    label = 'Import project files'; action = () => navigate('import');
+    title = 'Inspect your project sources';
+    description = 'Open Knowledge to see sources available for this snapshot.';
+    label = 'Open Knowledge'; action = () => navigate('knowledge');
   } else if (knowledge.index && !suites.length) {
     title = 'Explore your imported project';
     description = 'Ask the agent about its files and requirements. Imported projects support analysis; use the audited demo to try test execution.';
@@ -51,9 +51,9 @@ export default function WorkflowGuide({project,knowledge,plans,runs,busy,navigat
     description = finished ? 'A separate suite adds evidence. You will review and approve this plan before it runs.' : 'Start with an audited suite. Creating the plan does not execute any code.';
     label = finished ? 'Create next test plan' : 'Create test plan'; action = () => createPlan(nextSuite.id); Icon = FlaskConical;
   } else if (knowledge.index && finished) {
-    title = 'Review your release decision';
-    description = 'See why the evidence produces GO, NO-GO or insufficient evidence, then export the report.';
-    label = 'Open release report'; action = () => navigate('release');
+    title = project.demo ? 'Review your release decision' : 'Review your project results';
+    description = project.demo ? 'Review the measured release evidence and export the report.' : 'Inspect source findings, validation results and detected requirements.';
+    label = project.demo ? 'Open release report' : 'Open project report'; action = () => navigate('release');
   }
 
   const steps = suites.length ? [
@@ -73,7 +73,7 @@ export default function WorkflowGuide({project,knowledge,plans,runs,busy,navigat
     <p>{description}</p>
     <div className="guide-actions"><button className="btn primary" disabled={busy} onClick={action}>{label}<ArrowRight size={16}/></button><button className="text-button" onClick={() => navigate('agent')}>Ask a question<ArrowRight size={14}/></button></div>
     <ol className="guide-steps">{steps.map((step,index) => <li key={step.view}><button onClick={() => navigate(step.view)}><span className={step.done ? 'complete' : ''}>{step.done ? <Check size={12}/> : index + 1}</span>{step.label}</button></li>)}</ol>
-    {!suites.length && <p className="guide-demo-note">Your imported files power the inventory, charts and document analysis. Test execution is available only for the audited demo.</p>}
+    {!project.demo && <p className="guide-demo-note">Your files power diagnosis, Knowledge, parallel review and approved source validation.</p>}
     {project.demo && <p className="guide-demo-note">Demo tip: one expired-coupon test deliberately fails. A NO-GO verdict shows that the release gate is working.</p>}
   </section>;
 }

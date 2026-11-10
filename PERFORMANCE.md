@@ -63,3 +63,11 @@ Fixed the source-only Knowledge dead end: supported code files are available alo
 Imported projects hide unavailable approval/run navigation, test-only overview metrics and execution steps. Their report presents source findings instead of a release verdict. Direct links to testing screens explain the execution boundary and return to the current repository. Memory can save an explicit project note without any index; agent preference handling bypasses unnecessary retrieval. Navigation clears stale errors.
 
 Verified a Python-only imported project in the production UI: live NVIDIA embeddings, live cited retrieval, saved note surviving a new thread, reduced navigation and actual analysis report, with zero page exceptions. Static source checks do not execute imported tests; audited demo execution remains separate.
+
+## Linked project workflow and parallel review
+
+The cloud gateway now verifies the Python backend's package hash at readiness and on requests. Sandbox upgrades serialize installation, clear stale Python bytecode, and preserve the project database. Old healthy processes no longer satisfy readiness for a newer UI bundle.
+
+Diagnosis, Analysis, Knowledge, Approvals, Test runs, Memory and Project report use the same project ID in the browser URL. A source file can be selected from Repository, and projects without usable text have a labeled generated inventory source. Approved source validation records snapshot integrity and supported syntax checks in JUnit without executing imported code. Seven specialist model calls run concurrently, record independent outcomes, and present their interpretations separately from measured validation.
+
+Verification includes the platform tests, stale revision tests, a complete imported-folder browser workflow, live embeddings and retrieval, overlapping model calls, single-use approvals, JUnit artifacts, reload persistence and mobile layout. Run `node scripts/linked-workflow-qa.mjs` against the local production server to reproduce the imported project check.

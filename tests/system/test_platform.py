@@ -30,7 +30,7 @@ def test_symlink_rejected():
     with pytest.raises(ValueError,match='symlink'):import_zip(b.getvalue(),'attack')
 def test_secret_files_ignored():
     p=import_zip(archive([('.env','KEY=secret'),('src/main.py','def hello(): pass')]),'safe')
-    assert [x['path'] for x in p['files']]==['src/main.py'];assert not p['suites'];assert p['languages']['Python']==1
+    assert [x['path'] for x in p['files']]==['src/main.py'];assert [suite['id'] for suite in p['suites']]==['project_source_checks'];assert p['languages']['Python']==1
     assert p['symbols'][0]['name']=='hello'
 def test_empty_usable_archive_rejected():
     with pytest.raises(ValueError,match='No usable'):import_zip(archive([('.env','secret')]),'empty')
@@ -103,7 +103,7 @@ def test_local_directory_snapshot_and_exclusions(tmp_path,monkeypatch):
     source=tmp_path/'repo';source.mkdir();(source/'main.py').write_text('def hello(): return 1\n');(source/'README.md').write_text('# Requirements\nUse a valid order.');(source/'.env').write_text('SECRET=private');(source/'credentials.json').write_text('{"token":"private"}')
     (source/'node_modules').mkdir();(source/'node_modules'/'ignored.js').write_text('dependency')
     monkeypatch.setenv('TESTFORGE_LOCAL_ROOTS',str(tmp_path.resolve()))
-    p=import_local_directory(str(source));assert p['import_method']=='local_directory';assert not p['demo'];assert not p['suites']
+    p=import_local_directory(str(source));assert p['import_method']=='local_directory';assert not p['demo'];assert [suite['id'] for suite in p['suites']]==['project_source_checks']
     assert {f['path'] for f in p['files']}=={'main.py','README.md'}
     assert (source/'main.py').read_text()=='def hello(): return 1\n'
     (source/'main.py').write_text('changed after import')
@@ -155,7 +155,7 @@ def test_imported_requirements_are_discovered_not_demo_defaults():
     custom=import_zip(archive([('requirements.md','# Requirements\nREQ-207: preserve timestamps.\nR-42: reject invalid values.\nREQ-207 also needs boundary cases.')]),'custom')
     r=report(custom['id'])
     assert {item['requirement'] for item in r['traceability']}=={'REQ-207','R-42'}
-    assert r['verdict']=='INSUFFICIENT EVIDENCE';assert 'Imported repository' in r['caveat']
+    assert r['verdict']=='INSUFFICIENT EVIDENCE';assert 'Source validation' in r['caveat']
 
 def test_xml_requirement_ids_are_not_limited_to_demo_six(tmp_path):
     path=tmp_path/'results.xml';path.write_text('<testsuite><testcase name="test_REQ207_boundary" time="0.1"/><testcase name="test_R42_rejection" time="0.2"/></testsuite>')
@@ -308,6 +308,7 @@ def test_cloud_backend_requires_gateway_auth_and_blocks_host_paths(monkeypatch):
         result=c.get('/api/health',headers=headers)
         assert result.status_code==200 and result.json()['hosting']=='cloud'
         assert result.json()['local_directory']=={'enabled':False,'allowed_roots':[]}
+        assert c.get('/api/health',headers={**headers,'x-testforge-source-revision':'stale-revision'}).status_code==409
         assert c.post('/api/projects/import/local',headers=headers,json={'path':'/tmp'}).status_code==400
 
 def test_workspace_loads_project_data_without_activity_traces(demo):
@@ -348,7 +349,7 @@ def test_import_source_results_are_measured_not_execution():
     assert result['files']==4 and result['checked_files']==3
     assert {i['path'] for i in result['issues']}=={'broken.py','config.json'}
     assert result['test_files']==['test_ok.py'] and result['documentation_files']==1
-    assert p['suites']==[]
+    assert [suite['id'] for suite in p['suites']]==['project_source_checks']
 
 def test_import_excludes_caches_and_case_insensitive_secrets():
     p=import_zip(archive([('.next/generated.js','x'),('.ENV.local','secret'),('main.ts','export const x=1')]),'filtered')
@@ -374,3 +375,28 @@ def test_memory_note_does_not_need_index(demo):
         assert c.post(f"/api/projects/{demo['id']}/memory",json={'value':'Focus on validation'}).status_code==200
         assert any(row['value']=='Focus on validation' for row in c.get(f"/api/projects/{demo['id']}/memory").json())
         assert c.post(f"/api/projects/{demo['id']}/memory",json={'value':'   '}).status_code==422
+
+
+def test_imported_source_validation_uses_single_approval_and_preserves_code():
+    p=import_zip(archive([('test_never_run.py','raise RuntimeError("Executing this file would fail")'),('invalid.py','def invalid(:')]),'audited source validation')
+    suite='project_source_checks'
+    assert run_approved(p['id'],suite,'no-approval',p['snapshot'])['status']=='BLOCKED'
+    aid=approval(p,suite)
+    run=run_approved(p['id'],suite,aid,p['snapshot'])
+    assert run['execution_scope']=='source validation only'
+    assert run['status']=='FAIL' and run['counts']=={'passed':1,'failed':1,'errors':0,'skipped':0}
+    assert {case['name']:case['status'] for case in run['cases']}=={'invalid.py':'FAIL','test_never_run.py':'PASS'}
+    from services.store import DATA
+    assert parse_xml(DATA/'artifacts'/run['id']/'junit.xml')[1]==run['counts']
+    assert snapshot(Path(p['path']))==p['snapshot']
+    assert run_approved(p['id'],suite,aid,p['snapshot'])['status']=='BLOCKED'
+
+
+def test_no_text_project_has_citable_inventory():
+    from services.rag import documents
+    p=import_zip(archive([('empty.py',''),('settings.unknown','x=1')]),'source fallback')
+    sources=documents(p)
+    inventory=next(d for d in sources if d['kind']=='generated inventory')
+    assert inventory['source_path']=='[generated inventory]'
+    assert 'settings.unknown' in inventory['text']
+    assert len({source['id'] for source in sources})==len(sources)

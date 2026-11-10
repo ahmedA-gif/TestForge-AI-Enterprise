@@ -23,7 +23,9 @@ def retrieval(s):
     return {'evidence':evidence,'trace':s['trace']+['retrieve_evidence']}
 def reason(s):
     query=s['query'];memory_match=re.search(r'(?:prefer|remember(?: that)?(?: my preferred suite is)?)\s+([a-z_]+)',query,re.I)
-    if memory_match and memory_match.group(1).lower() in {'checkout_regression','checkout_py_smoke','checkout_ts_regression'}:
+    available={suite['id'] for suite in s['context']['project']['suites']}
+    if s['context']['project'].get('demo'):available.add('checkout_regression')
+    if memory_match and memory_match.group(1).lower() in available:
         val=memory_match.group(1).lower()
         with db() as c:c.execute('INSERT OR REPLACE INTO memories VALUES(?,?,?,?)',(s['project_id'],'preferred_suite',val,now()))
         audit('memory.save',s['project_id']);s['context']['memories']=memories(s['project_id'])
@@ -62,7 +64,7 @@ def reason(s):
 def plan(s):
     suites=s['context']['project']['suites'];chosen=next((x for x in suites if x['id']==s['decision'].get('suite_id')),suites[0] if suites else None)
     if not chosen:return {'plan':None,'trace':s['trace']+['unsupported_execution']}
-    p=put('plan',{'id':uid(),'project_id':s['project_id'],'thread_id':s['thread_id'],'suite_id':chosen['id'],'snapshot':s['context']['project']['snapshot'],'requirements':chosen['requirements'],'state':'pending','created_at':now(),'risk':'Audited fixture only; 30-second timeout; no provider secrets in runner.','reason':s['decision'].get('answer','Risk-based checkout coverage')},s['project_id'])
+    p=put('plan',{'id':uid(),'project_id':s['project_id'],'thread_id':s['thread_id'],'suite_id':chosen['id'],'snapshot':s['context']['project']['snapshot'],'requirements':chosen['requirements'],'state':'pending','created_at':now(),'risk':chosen.get('scope','Audited fixture only; 30-second timeout; no provider secrets in runner.'),'reason':s['decision'].get('answer','Risk-based checkout coverage')},s['project_id'])
     audit('plan.created',p['id']);return {'plan':p,'pending_approval':p,'trace':s['trace']+['make_plan']}
 def approval_gate(s):return {'trace':s['trace']+['approval_gate: waiting for explicit human approval']}
 def respond(s):
@@ -83,7 +85,7 @@ def replan(s):
         return {'plan':plan_,'pending_approval':plan_,'replan_count':count+1,'trace':s['trace']+['replan']}
     return {'plan':None,'pending_approval':None,'trace':s['trace']+['replan: no additional diagnostic needed']}
 def run_response(s):
-    r=s['run'];answer=f"Observed {r['status']}: {r.get('counts',{})}. Run {r.get('id','unknown')}. Release gate: {gate(all_records('run',s['project_id']))}."
+    r=s['run'];answer=f"Observed {r['status']}: {r.get('counts',{})}. Run {r.get('id','unknown')}. Release gate: {gate(all_records('run',s['project_id']),get('project',s['project_id'])['suites'])}."
     return {'response':answer,'messages':s.get('messages',[])+[{'role':'assistant','content':answer}],'trace':s['trace']+['respond']}
 connection=sqlite3.connect(DATA/'checkpoints.db',check_same_thread=False)
 saver=SqliteSaver(connection)

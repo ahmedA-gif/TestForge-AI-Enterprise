@@ -33,12 +33,15 @@ async def embeddings(texts,kind):
     return vectors
 
 def documents(project):
-    paths=sorted((ROOT/'knowledge/demo').glob('*.md')) if project['demo'] else [Path(project['path'])/f['path'] for f in project['files'] if Path(f['path']).suffix.lower() in {'.md','.txt','.py','.ts','.tsx','.js','.jsx','.json','.go','.rs','.java','.cs','.cpp','.yaml','.yml'}]
+    paths=sorted((ROOT/'knowledge/demo').glob('*.md')) if project['demo'] else [Path(project['path'])/f['path'] for f in project['files'] if Path(f['path']).suffix.lower() in {'.md','.txt','.py','.ts','.tsx','.js','.jsx','.json','.go','.rs','.java','.cs','.cpp','.yaml','.yml','.html','.css','.sql','.php','.rb','.toml','.ini','.xml','.ipynb','.c','.h','.vue','.svelte','.kt','.swift','.r','.csv',''}]
     if not project['demo']:paths=sorted(paths,key=lambda p:(p.suffix.lower() not in {'.md','.txt'},str(p)))
     docs=[]
     for i,p in enumerate(paths[:100]):
         text=p.read_text(errors='replace')
         docs.append({'id':p.stem.split('-')[0] if project['demo'] else f'D{i+1}','title':next((line.lstrip('# ').strip() for line in text.splitlines() if line.strip()),p.stem),'source_path':str(p.relative_to(ROOT)) if project['demo'] else str(p.relative_to(project['path'])),'text':text[:50000 if p.suffix.lower() in {'.md','.txt'} else 6000],'kind':'document' if p.suffix.lower() in {'.md','.txt'} else 'source code','truncated':len(text)>(50000 if p.suffix.lower() in {'.md','.txt'} else 6000),'revision':hashlib.sha256(text.encode()).hexdigest()})
+    if not project['demo'] and not any(doc['text'].strip() for doc in docs):
+        text='Project inventory (generated from the imported snapshot; not a requirements document).\n'+ '\n'.join(f"{f['path']} | {f['language']} | {f['size']} bytes" for f in project['files'])
+        docs.append({'id':f'D{len(docs)+1}','title':'Imported project inventory','source_path':'[generated inventory]','text':text[:12000],'revision':hashlib.sha256(text.encode()).hexdigest(),'kind':'generated inventory','truncated':len(text)>12000})
     return docs
 
 async def index(project_id,source_ids=None):
@@ -50,7 +53,9 @@ async def index(project_id,source_ids=None):
     for d in docs:
         lines=d['text'].splitlines()
         for start in range(0,len(lines),30):
-            quote='\n'.join(lines[start:start+35]);chunks.append({**d,'chunk_id':f"{d['id']}:{start+1}",'lines':[start+1,min(start+35,len(lines))],'quote':quote,'project_id':project_id})
+            quote='\n'.join(lines[start:start+35])
+            if not quote.strip():continue
+            chunks.append({**d,'chunk_id':f"{d['id']}:{start+1}",'lines':[start+1,min(start+35,len(lines))],'quote':quote,'project_id':project_id})
     if not chunks:raise ValueError('Selected sources contain no indexable text. Choose a non-empty code or document file.')
     vectors=await embeddings([x['quote'] for x in chunks],'passage');dim=len(vectors[0])
     if not dim or any(len(v)!=dim for v in vectors):raise ValueError('Embedding dimension mismatch')

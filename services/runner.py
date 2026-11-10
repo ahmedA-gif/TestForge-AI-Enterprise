@@ -17,7 +17,7 @@ def gate(runs,required_suites=None):
     if any(r.get('counts',{}).get('failed',0)>0 for r in latest.values()):return 'NO-GO'
     required=SUITES if required_suites is None else required_suites
     if not required or set(latest)!=set(s['id'] for s in required) or any(r['status']!='PASS' or r.get('counts',{}).get('passed',0)<1 or r.get('counts',{}).get('skipped',0)>0 or r.get('counts',{}).get('errors',0)>0 for r in latest.values()):return 'INSUFFICIENT EVIDENCE'
-    return 'GO / DEMO SCOPE'
+    return 'VALIDATION PASS' if all(s['id']=='project_source_checks' for s in required) else 'GO / DEMO SCOPE'
 
 def parse_xml(path):
     root=ET.parse(path).getroot();cases=[]
@@ -30,7 +30,7 @@ def parse_xml(path):
     return cases,counts
 
 def run_approved(project_id,suite_id,approval_id,snapshot_hash,run_id=None):
-    project=get('project',project_id);suite=next((s for s in SUITES if s['id']==suite_id),None)
+    project=get('project',project_id);suite=next((s for s in project['suites'] if s['id']==suite_id),None)
     def blocked(reason):
         audit('runner.blocked',project_id,reason)
         return {'status':'BLOCKED','reason':reason,'counts':{'passed':0,'failed':0,'errors':0,'skipped':0}}
@@ -40,7 +40,7 @@ def run_approved(project_id,suite_id,approval_id,snapshot_hash,run_id=None):
             existing=get('run',run_id)
             if existing['status']!='PENDING' or existing['project_id']!=project_id or existing['suite_id']!=suite_id or existing.get('approval_id')!=approval_id:return blocked('Run evidence is immutable')
         except ValueError:pass
-    if not project.get('demo') or not suite:return blocked('Unsupported suite/project')
+    if not suite or (not project.get('demo') and suite_id!='project_source_checks'):return blocked('Unsupported suite/project')
     if snapshot_hash!=project['snapshot'] or snapshot(Path(project['path']))!=snapshot_hash:return blocked('Snapshot mismatch')
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
@@ -51,6 +51,9 @@ def run_approved(project_id,suite_id,approval_id,snapshot_hash,run_id=None):
     rid=run_id or uid();directory=DATA/'artifacts'/rid;directory.mkdir(parents=True,exist_ok=True);xml=directory/'junit.xml'
     run={'id':rid,'project_id':project_id,'suite_id':suite_id,'approval_id':approval_id,'snapshot':snapshot_hash,'started_at':now(),'status':'RUNNING','counts':{'passed':0,'failed':0,'errors':0,'skipped':0},'cases':[],'artifacts':[]}
     put('run',run,project_id)
+    if suite_id=='project_source_checks':
+        from services.source_checks import execute_source_checks
+        return execute_source_checks(project,run,directory,time.monotonic())
     if suite_id=='checkout_py_smoke':cmd=[sys.executable,'-m','pytest','fixtures/checkout_py/test_checkout.py','-q',f'--junitxml={xml}']
     else:cmd=[os.getenv('TESTFORGE_NODE','node'),str(ROOT/'node_modules/vitest/vitest.mjs'),'run','--config','fixtures/checkout_ts/vitest.config.mts','--reporter=junit',f'--outputFile={xml}']
     env={k:v for k,v in os.environ.items() if k in {'PATH','HOME','TMPDIR','SYSTEMROOT','LANG'}};env.update({'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1','NO_COLOR':'1'})

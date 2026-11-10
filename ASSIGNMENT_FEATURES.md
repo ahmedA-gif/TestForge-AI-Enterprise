@@ -22,3 +22,21 @@ Use `./scripts/start-local-production.sh` from the checkout. It builds the optim
 
 ## Boundaries
 This is an academic owner workspace. Team RBAC, arbitrary imported-code execution, public GitHub imports and additional language analyzers remain roadmap work. No claim of zero possible defects, measured code coverage or full enterprise compliance is made.
+
+## Parallel review and linked project workflow
+
+The selected project ID stays in each view link. Import a folder once, then use Diagnose for measured findings, Analysis for the specialist team, Knowledge for citations, Approvals for authorization, Test runs for measured results, and Memory for notes and conversation history.
+
+The LangGraph coordinator handles chat and approval routing. Analysis starts seven independent NVIDIA model reviews concurrently against a bounded snapshot. Each role stores its status, duration, findings and source references. Reviews appear in the project evidence export.
+
+| Specialist | Job |
+|---|---|
+| Inventory | Map files, languages and structure. |
+| Diagnostics | Explain measured parsing failures and investigate likely defects. |
+| Security | Review source excerpts for security risks. |
+| Dependency | Review manifests and configuration. |
+| Test design | Identify missing cases and suggest tests. |
+| Knowledge | Review requirements and citation gaps. |
+| Release evidence | Assess available validation and test evidence. |
+
+Imported projects have an approval-bound source validation suite. It checks file integrity and supported syntax and records JUnit evidence. Runtime Pytest and Vitest execution is available in the audited demo. A read-only specialist review and a measured validation run have separate records and appear separately in the UI.

@@ -81,9 +81,17 @@ async def import_folder(files:list[UploadFile]=File(...),paths:str=Form(...)):
 def project(project_id:str):
     p=get('project',project_id)
     if not p['demo'] and p.get('suites')!=[SOURCE_SUITE]:p['suites']=[dict(SOURCE_SUITE)];put('project',p)
-    if 'analysis' not in p:
-        from services.source_analysis import analyze_source
-        p['analysis']=analyze_source(p['path'],p['files']);put('project',p)
+    from services.source_analysis import ANALYSIS_VERSION, analyze_source
+    from services.source_languages import source_language
+    if (p.get('analysis') or {}).get('version') != ANALYSIS_VERSION:
+        languages = {}
+        for file in p['files']:
+            language, _ = source_language(Path(file['path']).name)
+            file['language'] = language
+            languages[language] = languages.get(language, 0) + 1
+        p['languages'] = languages
+        p['analysis'] = analyze_source(p['path'], p['files'])
+        put('project', p)
     return p
 @app.get('/api/projects/{project_id}/evidence')
 def evidence(project_id:str):

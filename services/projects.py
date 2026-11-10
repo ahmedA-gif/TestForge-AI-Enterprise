@@ -2,8 +2,8 @@ import io,zipfile,stat,hashlib,json,os,zlib
 from pathlib import Path,PurePosixPath
 from services.store import *
 from services.source_analysis import analyze_source
+from services.source_languages import source_language
 IGNORE={'.git','node_modules','dist','build','.venv','venv','__pycache__','.pytest_cache','.next','.nuxt','.cache','coverage','.wrangler','.sites-runtime','.vinext'}
-EXT={'.py':'Python','.ts':'TypeScript','.tsx':'TypeScript','.js':'JavaScript','.jsx':'JavaScript','.java':'Java','.cs':'C#','.go':'Go','.cpp':'C++','.rs':'Rust','.mts':'TypeScript','.cts':'TypeScript','.mjs':'JavaScript','.cjs':'JavaScript'}
 SUITES=[{'id':'checkout_py_smoke','name':'Backend smoke checks','framework':'Pytest','language':'Python','source':'fixtures/checkout_py/test_checkout.py','requirements':['R-01','R-02','R-03','R-04','R-05'],'timeout':30}, {'id':'checkout_ts_regression','name':'Frontend regression checks','framework':'Vitest','language':'TypeScript','source':'fixtures/checkout_ts/checkout.test.ts','requirements':['R-01','R-05','R-06'],'timeout':30}]
 SOURCE_SUITE={'id':'project_source_checks','name':'Project source validation','framework':'Source validation','language':'Project files','source':'Selected project snapshot','requirements':[],'timeout':30,'scope':'Snapshot integrity and supported syntax parsing.'}
 def create_demo():
@@ -17,7 +17,7 @@ def inventory(path,name,demo=False):
     files=[];counts={};symbols=[]
     for p in sorted(path.rglob('*')):
         if not p.is_file() or any(x in IGNORE or x.startswith('.env') for x in p.relative_to(path).parts):continue
-        rel=str(p.relative_to(path));lang=EXT.get(p.suffix.lower(),'Document' if p.suffix.lower() in ['.md','.txt'] else 'Other')
+        rel=str(p.relative_to(path));lang,_=source_language(p.name)
         counts[lang]=counts.get(lang,0)+1
         files.append({'path':rel,'language':lang,'size':p.stat().st_size,'hash':hashlib.sha256(p.read_bytes()).hexdigest()})
         if p.suffix=='.py':

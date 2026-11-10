@@ -32,17 +32,54 @@ async def embeddings(texts,kind):
         vectors.append(vector)
     return vectors
 
+# Keep existing source IDs stable when enabling previously unlisted extensions.
+LEGACY_SOURCE_EXTENSIONS = {
+    '.md','.txt','.py','.ts','.tsx','.js','.jsx','.json','.go','.rs','.java','.cs','.cpp',
+    '.yaml','.yml','.html','.css','.sql','.php','.rb','.toml','.ini','.xml','.ipynb',
+    '.c','.h','.vue','.svelte','.kt','.swift','.r','.csv','',
+}
+
+
 def documents(project):
-    paths=sorted((ROOT/'knowledge/demo').glob('*.md')) if project['demo'] else [Path(project['path'])/f['path'] for f in project['files'] if Path(f['path']).suffix.lower() in {'.md','.txt','.py','.ts','.tsx','.js','.jsx','.json','.go','.rs','.java','.cs','.cpp','.yaml','.yml','.html','.css','.sql','.php','.rb','.toml','.ini','.xml','.ipynb','.c','.h','.vue','.svelte','.kt','.swift','.r','.csv',''}]
-    if not project['demo']:paths=sorted(paths,key=lambda p:(p.suffix.lower() not in {'.md','.txt'},str(p)))
-    docs=[]
-    for i,p in enumerate(paths[:100]):
-        text=p.read_text(errors='replace')
-        docs.append({'id':p.stem.split('-')[0] if project['demo'] else f'D{i+1}','title':next((line.lstrip('# ').strip() for line in text.splitlines() if line.strip()),p.stem),'source_path':str(p.relative_to(ROOT)) if project['demo'] else str(p.relative_to(project['path'])),'text':text[:50000 if p.suffix.lower() in {'.md','.txt'} else 6000],'kind':'document' if p.suffix.lower() in {'.md','.txt'} else 'source code','truncated':len(text)>(50000 if p.suffix.lower() in {'.md','.txt'} else 6000),'revision':hashlib.sha256(text.encode()).hexdigest()})
+    from services.source_languages import DOCUMENT_EXTENSIONS
+    root = ROOT if project['demo'] else Path(project['path'])
+    if project['demo']:
+        paths = sorted((root/'knowledge/demo').glob('*.md'))
+    else:
+        paths = [root/file['path'] for file in project['files']]
+        paths.sort(key=lambda path: (
+            path.suffix.lower() not in LEGACY_SOURCE_EXTENSIONS,
+            path.suffix.lower() not in {'.md', '.txt'}, str(path),
+        ))
+    docs = []
+    for number, path in enumerate(paths, start=1):
+        if len(docs) >= 100:
+            break
+        try:
+            text = path.read_bytes().decode('utf-8-sig')
+        except (OSError, UnicodeError):
+            continue
+        if '\0' in text:
+            continue
+        document = path.suffix.lower() in DOCUMENT_EXTENSIONS
+        limit = 50000 if document else 6000
+        title = next((line.lstrip('# ').strip() for line in text.splitlines() if line.strip()), path.stem) if document else path.name
+        docs.append({
+            'id': path.stem.split('-')[0] if project['demo'] else f'D{number}',
+            'title': title[:160], 'source_path': str(path.relative_to(root)), 'text': text[:limit],
+            'kind': 'document' if document else 'source code', 'truncated': len(text) > limit,
+            'revision': hashlib.sha256(text.encode()).hexdigest(),
+        })
     if not project['demo'] and not any(doc['text'].strip() for doc in docs):
-        text='Project inventory (generated from the imported snapshot; not a requirements document).\n'+ '\n'.join(f"{f['path']} | {f['language']} | {f['size']} bytes" for f in project['files'])
-        docs.append({'id':f'D{len(docs)+1}','title':'Imported project inventory','source_path':'[generated inventory]','text':text[:12000],'revision':hashlib.sha256(text.encode()).hexdigest(),'kind':'generated inventory','truncated':len(text)>12000})
+        text = 'Project inventory (generated from the imported snapshot).\n' + '\n'.join(
+            f"{file['path']} | {file['language']} | {file['size']} bytes" for file in project['files']
+        )
+        docs.append({'id': 'inventory', 'title': 'Imported project inventory',
+                     'source_path': '[generated inventory]', 'text': text[:12000],
+                     'revision': hashlib.sha256(text.encode()).hexdigest(),
+                     'kind': 'generated inventory', 'truncated': len(text) > 12000})
     return docs
+
 
 async def index(project_id,source_ids=None):
     p=get('project',project_id);docs=documents(p);chunks=[]

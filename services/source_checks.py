@@ -15,7 +15,9 @@ def execute_source_checks(project,run,directory,start):
             if actual!=source['hash']:failures.append('File differs from the reviewed snapshot')
         except OSError:failures.append('Snapshot file is unavailable')
         failures += [f"{i['check']} at line {i['line']}: {i['message']}" for i in issues.get(source['path'],[])]
-        cases.append({'name':source['path'],'classname':'project_source_checks','duration':0.0,'status':'FAIL' if failures else 'PASS','failure':'\n'.join(failures),'requirement':None,'scope':'Snapshot integrity; Python/JSON parsing where supported. Uploaded unit tests were not executed.'})
+        checks=['File integrity']
+        if source['path'] in analysis['syntax_checks']:checks.append(analysis['syntax_checks'][source['path']])
+        cases.append({'checks':checks,'name':source['path'],'classname':'project_source_checks','duration':0.0,'status':'FAIL' if failures else 'PASS','failure':'\n'.join(failures),'requirement':None,'scope':'Snapshot integrity and bundled syntax checks where available.'})
     counts={'passed':sum(c['status']=='PASS' for c in cases),'failed':sum(c['status']=='FAIL' for c in cases),'errors':0,'skipped':0}
     root=ET.Element('testsuite',name='Audited project source validation',tests=str(len(cases)),failures=str(counts['failed']))
     for case in cases:

@@ -71,3 +71,11 @@ The cloud gateway now verifies the Python backend's package hash at readiness an
 Diagnosis, Analysis, Knowledge, Approvals, Test runs, Memory and Project report use the same project ID in the browser URL. A source file can be selected from Repository, and projects without usable text have a labeled generated inventory source. Approved source validation records snapshot integrity and supported syntax checks in JUnit without executing imported code. Seven specialist model calls run concurrently, record independent outcomes, and present their interpretations separately from measured validation.
 
 Verification includes the platform tests, stale revision tests, a complete imported-folder browser workflow, live embeddings and retrieval, overlapping model calls, single-use approvals, JUnit artifacts, reload persistence and mobile layout. Run `node scripts/linked-workflow-qa.mjs` against the local production server to reproduce the imported project check.
+
+## LangChain orchestration and broader language support
+
+Chat and specialist model requests now use LangChain prompt and runnable chains. The specialist graph fans out seven independent reviews with LangGraph `Send`, validates each response, verifies quoted excerpts, and collects results in role order. A malformed response gets one retry. A failed branch keeps its own error without discarding the other results. Analysis shows each specialist's job and reasoning method.
+
+Readable UTF-8 source is eligible for Knowledge regardless of filename extension. Pygments identifies recognized languages. Bundled Tree-sitter grammars and standard-library parsers provide measured syntax findings for supported formats. Source validation records the checks performed on each file, and older project records update in place.
+
+Verified 80 platform tests, 19 desktop/mobile browser views, and the complete production-mode browser workflow with Go, TypeScript, JavaScript and a custom extension. The mixed project exercised live embeddings, a real syntax failure, approval, JUnit evidence, memory persistence, and seven overlapping model calls. The locked dependencies also resolved as Linux x86-64 wheels for Python 3.12.

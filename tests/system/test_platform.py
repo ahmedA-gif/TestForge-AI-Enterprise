@@ -354,7 +354,7 @@ def test_import_source_results_are_measured_not_execution():
 def test_import_excludes_caches_and_case_insensitive_secrets():
     p=import_zip(archive([('.next/generated.js','x'),('.ENV.local','secret'),('main.ts','export const x=1')]),'filtered')
     assert [f['path'] for f in p['files']]==['main.ts']
-    assert p['analysis']['checked_files']==0
+    assert p['analysis']['syntax_checks']=={'main.ts':'TypeScript syntax'}
 
 def test_source_only_project_can_select_and_index(monkeypatch):
     import services.rag as rag
@@ -394,9 +394,35 @@ def test_imported_source_validation_uses_single_approval_and_preserves_code():
 
 def test_no_text_project_has_citable_inventory():
     from services.rag import documents
-    p=import_zip(archive([('empty.py',''),('settings.unknown','x=1')]),'source fallback')
+    p=import_zip(archive([('empty.py',''),('settings.unknown','  ') ]),'source fallback')
     sources=documents(p)
     inventory=next(d for d in sources if d['kind']=='generated inventory')
     assert inventory['source_path']=='[generated inventory]'
     assert 'settings.unknown' in inventory['text']
     assert len({source['id'] for source in sources})==len(sources)
+
+
+@pytest.mark.parametrize('filename,source,expected',[
+    ('broken.go','package main\nfunc invalid( {','Go syntax'),
+    ('broken.ts','const value: number = ;','TypeScript syntax'),
+    ('broken.rs','fn invalid( {','Rust syntax'),
+    ('Broken.java','class Broken { int x = ; }','Java syntax'),
+    ('broken.cs','class Broken { int x = ; }','C# syntax'),
+    ('broken.cpp','int main() { int x = ; }','C++ syntax'),
+])
+def test_non_python_grammar_reports_measured_error(filename,source,expected):
+    p=import_zip(archive([(filename,source)]),'polyglot syntax')
+    assert p['analysis']['syntax_checks']=={filename:expected}
+    assert any(issue['path']==filename and issue['check']==expected for issue in p['analysis']['issues'])
+
+
+def test_existing_snapshot_migrates_and_unfamiliar_text_can_be_indexed():
+    from services.api import project
+    from services.rag import documents
+    p=import_zip(archive([('main.go','package main\nfunc main() {}'),('rules.customlang','total = price * quantity')]),'existing project')
+    p['analysis']={'version':1};p['languages']={'Other':2};put('project',p)
+    updated=project(p['id'])
+    assert updated['snapshot']==p['snapshot'] and updated['id']==p['id']
+    assert updated['languages']=={'Go':1,'Other text':1}
+    assert updated['analysis']['syntax_checks']=={'main.go':'Go syntax'}
+    assert any(source['source_path']=='rules.customlang' and 'price * quantity' in source['text'] for source in documents(updated))

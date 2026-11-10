@@ -24,12 +24,12 @@ The supplied key is already configured in the ignored, owner-readable `.env` on 
 
 - React/TypeScript interface with project overview, safe ZIP import, repository inventory/AST symbols, knowledge sources, agent chat, approvals, execution evidence, release reports and memory inspection.
 - FastAPI typed request handling with SQLite records, audit events, approvals, runs and project-scoped preferences.
-- **One LangGraph StateGraph**, with parse/context/retrieval/reasoning/planning/approval/MCP/evaluation/replanning/response nodes. Durable SQLite checkpoints use project + thread keys.
+- **LangChain and LangGraph** handle the conversation coordinator and seven concurrent specialist reviews. Each specialist validates its response and source references. Durable SQLite conversation checkpoints use project + thread keys.
 - Live NVIDIA chat and embedding integrations. Model IDs are configurable; defaults were verified with real API requests. Retrieval uses measured 2,048-dimensional embeddings and local Qdrant. No lexical fallback is presented as semantic retrieval.
-- Six synthetic knowledge documents, deterministic chunk IDs, revision hashes, source paths, line ranges, quoted evidence and similarity scores. Tiny demo documents remain intact; longer documents use overlapping line windows.
+- Knowledge indexes readable UTF-8 code and documents across file extensions. Citations include source paths, line ranges, quoted evidence and similarity scores. Bundled parsers provide measured syntax checks across multiple languages.
 - Official **MCP Python SDK v2** over stdio. Every execution client connection performs actual `list_tools` and `call_tool`. Five tools expose inventory, discovery, suite details, execution and results.
 - Single-use, expiring, snapshot-bound approval enforced independently by the MCP runner. Duplicate approval submissions return the same queued run. Changed snapshots and unapproved suites fail closed.
-- Real Pytest and Vitest execution, original JUnit XML, stdout/stderr, normalized test cases, exit codes, timestamps and artifact downloads. Bounded replanning proposes another suite with a new pending approval.
+- The audited demo runs Pytest and Vitest. Imported project runs validate snapshot integrity and bundled syntax. Both produce JUnit evidence, logs, timestamps and downloadable artifacts.
 - Deterministic release policy: required acceptance failures → NO-GO; missing/error/timeout evidence → INSUFFICIENT EVIDENCE; both required suites passing → GO for demo scope only.
 - PDF release report, JSON report, ZIP evidence export and browser transcript export.
 
@@ -89,7 +89,7 @@ The prompt in `services/agent.py` explicitly separates specifications, measured 
 
 See `IMPLEMENTATION.md` for the full requirement map. The PDF is a planning blueprint, not evidence that all commercial features exist. Its P0 academic track is the implementation target. The source assignment/instructor scenario pack is not attached separately; the six documents and checkout scenario are explicitly synthetic.
 
-P1/P2 features remain roadmap items: GitHub/private repository import, arbitrary uploaded-code execution, isolated microVM/container pools, Semgrep, Tree-sitter, extra language runners, organizations/RBAC, CI/CD, billing, retention/SLOs and compliance certification. Folder selection uploads explicitly selected files. Typed local paths are confined to configured server roots and require a loopback connection. There is no production-safety or complete code-coverage claim.
+P1/P2 features remain roadmap items: GitHub/private repository import, arbitrary uploaded-code execution, isolated microVM/container pools, Semgrep, extra language runners, organizations/RBAC, CI/CD, billing, retention/SLOs and compliance certification. Folder selection uploads explicitly selected files. Typed local paths are confined to configured server roots and require a loopback connection. There is no production-safety or complete code-coverage claim.
 
 Hosting the complete Python/MCP/test-runner architecture requires a dedicated server/runner deployment. Sites Workers cannot run the required Python subprocesses; the functional application is delivered locally instead of publishing a disconnected frontend.
 

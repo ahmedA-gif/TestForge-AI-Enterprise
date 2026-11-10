@@ -59,7 +59,8 @@ def test_all_seven_reviews_overlap_and_keep_role_specific_observations(records,m
     assert state['peak']==7 and len(state['roles'])==7
     assert result['status']=='PASS' and result['completed_agents']==7
     assert all(agent['started_at'] and agent['finished_at'] and agent['findings'][0]['basis']=='inference' for agent in result['agents'])
-    assert all(agent['findings'][0]['citation_valid'] for agent in result['agents'])
+    assert all(agent['findings'][0]['citation_valid'] == (agent['id']!='dependencies') for agent in result['agents'])
+    assert all(agent['reasoning_type'] for agent in result['agents'])
     assert team.latest_team_job('two') is None
     assert len([key for key in data if key[0]=='llm_trace'])==7
 
@@ -103,3 +104,19 @@ def test_invalid_output_and_fabricated_citation_fail_closed():
     output['choices'][0]['message']['content']=json.dumps(parsed)
     _,findings=team._parse_output(output,{'main.py':'return 1'})
     assert findings[0]['path']=='main.py' and findings[0]['citation_valid'] is False
+
+
+def test_invalid_json_is_retried_before_saving_findings(records,monkeypatch):
+    attempts = {}
+    async def provider(path, payload):
+        role = re.search(r'ROLE_ID: (\w+)', payload['messages'][0]['content']).group(1)
+        attempts[role] = attempts.get(role, 0) + 1
+        if role == 'diagnostics' and attempts[role] == 1:
+            return {'choices': [{'message': {'content': '{"summary":"incomplete"'}}]}
+        return response(role)
+    monkeypatch.setattr(team, 'provider', provider)
+    job = team.create_team_job('one')
+    result = asyncio.run(team.run_team('one', job['id']))
+    assert result['status'] == 'PASS'
+    assert attempts['diagnostics'] == 2
+    assert sum(attempts.values()) == 8

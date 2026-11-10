@@ -2,3 +2,8 @@
 @media(max-width:900px){.pw-team-heading{flex-wrap:wrap}.pw-team-heading>.btn{min-width:180px}}
 @media(max-width:650px){.pw-workflow{padding:16px}.pw-workflow nav{display:grid;grid-template-columns:1fr 1fr}.pw-workflow nav button{justify-content:flex-start;font-size:11px;padding:10px 8px}.pw-workflow nav button>svg:last-child{margin-left:auto}.pw-agent-grid{grid-template-columns:1fr}.pw-team-heading>.btn{width:100%}.pw-agent{padding:16px}.pw-agent-top{flex-wrap:wrap}.pw-team-heading h2{font-size:21px}}
 @media(prefers-reduced-motion:reduce){.pw-team .spin{animation:none}}
+
+/* Model reviews may include long paths or snapshot identifiers. */
+.pw-agent {
+  overflow-wrap: anywhere;
+}

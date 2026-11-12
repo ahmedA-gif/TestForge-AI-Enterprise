@@ -99,3 +99,19 @@ body::before{content:none}
 @media(max-width:650px){.file-row .text-button{font-size:9px}.file-row small{display:none}}
 /* Short opacity transitions avoid scroll-triggered motion or costly page transforms. */
 @media(prefers-reduced-motion:no-preference){.pw-agent-grid,.source-results,.run-detail{animation:project-reveal .14s ease-out}@keyframes project-reveal{from{opacity:.7}to{opacity:1}}}
+
+.message-text {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.chat-saved-note {
+  margin: 16px 0;
+  padding: 12px 14px;
+  border: 1px solid #74688466;
+  border-radius: 6px;
+  background: #ffffff44;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.chat-saved-note summary { cursor: pointer; font-weight: 650; }
+.chat-saved-note p { margin: 8px 0 12px; white-space: pre-wrap; }

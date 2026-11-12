@@ -426,3 +426,24 @@ def test_existing_snapshot_migrates_and_unfamiliar_text_can_be_indexed():
     assert updated['languages']=={'Go':1,'Other text':1}
     assert updated['analysis']['syntax_checks']=={'main.go':'Go syntax'}
     assert any(source['source_path']=='rules.customlang' and 'price * quantity' in source['text'] for source in documents(updated))
+
+
+def test_saved_review_note_recalls_in_new_thread_without_model_or_index(monkeypatch):
+    from services import agent
+    from services.api import MemoryNote, save_memory_note, delete_memory
+    project = import_zip(archive([('main.py', 'value=1')]), 'notes project')
+    other = import_zip(archive([('main.py', 'value=2')]), 'other project')
+    note = 'Explain each issue simply. Include the file, line, and one suggested fix.'
+    save_memory_note(project['id'], MemoryNote(value=note))
+    async def unexpected(*args, **kwargs):
+        raise AssertionError('Saved note recall must read SQLite directly')
+    monkeypatch.setattr(agent, 'provider', unexpected)
+    monkeypatch.setattr(agent, 'retrieve', unexpected)
+    request = 'What review preference did I save for this project?'
+    for thread in ('first-chat', 'fresh-chat'):
+        response = agent.chat(project['id'], thread, request)
+        assert response['response'] == 'Your saved project note\n\n' + note
+        assert response['plan'] is None
+    assert note not in agent.chat(other['id'], 'fresh-chat', request)['response']
+    delete_memory(project['id'], 'project_note')
+    assert note not in agent.chat(project['id'], 'after-delete', request)['response']
